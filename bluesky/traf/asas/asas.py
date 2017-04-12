@@ -21,6 +21,7 @@ import DoNothing
 import Eby
 import MVP
 import Swarm
+import SSD
 
 
 class ASAS(DynamicArrays):
@@ -31,7 +32,7 @@ class ASAS(DynamicArrays):
     CDmethods = {"STATEBASED": StateBasedCD}
 
     # Dictionary of CR methods
-    CRmethods = {"OFF": DoNothing, "MVP": MVP, "EBY": Eby, "SWARM": Swarm}
+    CRmethods = {"OFF": DoNothing, "MVP": MVP, "EBY": Eby, "SWARM": Swarm, "SSD": SSD}
 
     @classmethod
     def addCDMethod(asas, name, module):
@@ -115,6 +116,10 @@ class ASAS(DynamicArrays):
         self.LOSmaxsev    = []
         self.LOShmaxsev   = []
         self.LOSvmaxsev   = []
+        
+        # For SSD
+        self.resov        = []
+        
 
     def toggle(self, flag=None):
         if flag is None:
@@ -350,3 +355,15 @@ class ASAS(DynamicArrays):
             for i in range(self.traf.ntraf):
                 if np.any(iconf0[i] != self.iconf[i]):
                     self.traf.label[i] = [" ", " ", " ", " "]
+                    
+    def test(self):
+        # Extra SSD related stuff
+        
+        if self.cr.check_pyclipper():
+            self.cr.initializeSSD(self, self.traf)
+            output = self.cr.constructSSD(self, self.traf)
+            self.cr.resolve_closest(self, self.traf)
+        else:
+            output = 'Could not import pyclipper, RESO SSD will not function'
+
+        return output

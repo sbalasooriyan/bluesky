@@ -588,6 +588,12 @@ def init(sim, traf, scr):
             scr.showssd,
             "Show state-space diagram (=conflict prevention display/predictive ASAS)"
         ],
+        "SUBA": [
+            "SUBA cmd",
+            "string",
+            scr.suba,
+            "Input python command..."
+        ],
         "SWRAD": [
             "SWRAD GEO/GRID/APT/VOR/WPT/LABEL/ADSBCOVERAGE/TRAIL [dt]/[value]",
             "txt,[float]",
