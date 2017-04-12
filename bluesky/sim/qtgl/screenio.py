@@ -8,6 +8,11 @@ except ImportError:
 import numpy as np
 import time
 
+# Test imports (SUBA)
+from ...traf.asas import SSD_dump
+from ...traf.asas import SSD
+import suba_fun
+
 # Local imports
 from ... import stack
 from timer import Timer
@@ -77,6 +82,41 @@ class ScreenIO(QObject):
     def echo(self, text):
         if self.manager.isActive():
             self.manager.sendEvent(StackTextEvent(disptext=text))
+            
+    def suba(self, cmd_text):
+        if self.manager.isActive():
+            # Check whether first four letters are "exec"
+            if cmd_text[:3] == 'FUN':
+                cmd_text = cmd_text[3:] + '()'
+            if cmd_text[:4] == 'VARS':
+                cmd_text = 'VARS(' + cmd_text[4:] + ')'
+            if cmd_text[:4] == 'EXEC':
+                # Execute custom things
+                output = SSD_dump.test_fun(self.sim.traf)
+                if not type(output) == 'str':
+                    output = str(output)
+            if cmd_text[:4] == 'EXES':
+                # Execute custom things
+                output = SSD.test_fun()
+                if not type(output) == 'str':
+                    output = str(output)
+            else:
+                # Send cmd_text to cmd_eval, which runs the first parse
+                output, cmd_text = suba_fun.cmd_eval(self,cmd_text)
+                try:
+                    cmd_res = str(eval(cmd_text))
+                except:
+                    # Send cmd_text to cmd_eval_correct to correct initial parse
+                    output, cmd_text = suba_fun.cmd_eval_correct(self,cmd_text,output)
+                    try:
+                        cmd_res = str(eval(cmd_text))
+                    except:
+                        cmd_res = 'Error in issued and corrected command-line'
+                # Update output with result of command
+                if cmd_res != 'None':
+                    output += '\n' + cmd_res
+            # Display
+            self.manager.sendEvent(StackTextEvent(disptext=output))
 
     def cmdline(self, text):
         if self.manager.isActive():

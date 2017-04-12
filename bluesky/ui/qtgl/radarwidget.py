@@ -44,6 +44,7 @@ magenta               = (255, 0,   255)
 grey                  = (100, 100, 100)
 white                 = (255, 255, 255)
 lightgrey             = (160, 160, 160)
+yellow                = (255, 255, 0)
 
 VERTEX_IS_LATLON, VERTEX_IS_METERS, VERTEX_IS_SCREEN = range(3)
 ATTRIB_VERTEX, ATTRIB_TEXCOORDS, ATTRIB_LAT, ATTRIB_LON, ATTRIB_ORIENTATION, ATTRIB_COLOR, ATTRIB_TEXDEPTH = range(7)
@@ -551,7 +552,8 @@ class RadarWidget(QGLWidget):
         # SSD
         if self.ssd_all or len(self.ssd_ownship) > 0:
             self.ssd_shader.use()
-            gl.glUniform3f(self.ssd_shader.loc_vlimits, 4e4, 25e4, 500.0)
+#            gl.glUniform3f(self.ssd_shader.loc_vlimits, 4e4, 25e4, 500.0)
+            gl.glUniform3f(self.ssd_shader.loc_vlimits, (200./3600*1852)**2, (600./3600*1852)**2, 600./3600*1852)
             gl.glUniform1i(self.ssd_shader.loc_nac, self.naircraft)
             if self.ssd_all:
                 self.ssd.draw(first_vertex=0, vertex_count=self.naircraft, n_instances=self.naircraft)
