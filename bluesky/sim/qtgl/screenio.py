@@ -293,6 +293,13 @@ class ScreenIO(QObject):
             data.confcpalat = self.sim.traf.asas.latowncpa
             data.confcpalon = self.sim.traf.asas.lonowncpa
             data.trk        = self.sim.traf.hdg
+            # If resolution is evaluated, else send zeros
+            if self.sim.traf.asas.resoeval:
+                data.reson  = self.sim.traf.asas.reson
+                data.resoe  = self.sim.traf.asas.resoe
+            else:
+                data.reson  = np.zeros(self.sim.traf.ntraf, dtype=np.float32)
+                data.resoe  = np.zeros(self.sim.traf.ntraf, dtype=np.float32)
 
             # Trails, send only new line segments to be added            
             data.swtrails  = self.sim.traf.trails.active 
