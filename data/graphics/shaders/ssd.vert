@@ -26,10 +26,15 @@ layout (location=7) in float alt1;
 layout (location=8) in float tas1;
 layout (location=9) in float trk1;
 
+// Resolution vector, instanced
+layout (location=10) in float reson;
+layout (location=11) in float resoe;
+
 out GSData {
     vec2 vAR;
     vec4 ownship;
     vec4 intruder;
+	vec2 reso;
     float dH;
     int own_id;
     int int_id;
@@ -51,5 +56,6 @@ void main() {
     to_gs.dH       = alt1 - alt0;
     to_gs.own_id   = gl_InstanceID;
     to_gs.int_id   = gl_VertexID;
+	to_gs.reso	   = vec2(resoe, reson);
     gl_Position    = vec4(vec2(1.0, float(screen_width) / float(screen_height)) * zoom * flat_earth * position, 0.0, 1.0);
 }
