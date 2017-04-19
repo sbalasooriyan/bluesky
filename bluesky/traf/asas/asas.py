@@ -117,8 +117,10 @@ class ASAS(DynamicArrays):
         self.LOShmaxsev   = []
         self.LOSvmaxsev   = []
         
-        # For SSD
-        self.resov        = []
+        # For SSD 
+        self.reson        = np.array([])               # [m/s] North resolution speed 
+        self.resoe        = np.array([])               # [m/s] East resolution speed
+        self.resoeval     = False                      # [-] Whether target resolution is calculated or not 
         
 
     def toggle(self, flag=None):
@@ -341,7 +343,9 @@ class ASAS(DynamicArrays):
 
     def update(self, simt):
         iconf0 = np.array(self.iconf)
-
+        
+#        print "Im in asas. ntraf is ", self.traf.ntraf        
+        
         # Scheduling: update when dt has passed
         if self.swasas and simt >= self.tasas:
             self.tasas += self.dtasas
@@ -362,7 +366,7 @@ class ASAS(DynamicArrays):
         if self.cr.check_pyclipper():
             self.cr.initializeSSD(self, self.traf)
             output = self.cr.constructSSD(self, self.traf)
-            self.cr.resolve_closest(self, self.traf)
+            self.cr.resolve_closest(self, self.traf, True)
         else:
             output = 'Could not import pyclipper, RESO SSD will not function'
 

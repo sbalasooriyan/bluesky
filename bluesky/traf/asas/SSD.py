@@ -49,13 +49,21 @@ def resolve(dbconf, traf):
     # Construct the SSD
     constructSSD(dbconf, traf)
     
-    # Get resolved speed-vector
-    resolve_closest(dbconf, traf)
+    # Get resolved speed-vector (True/False for right-turning solution)
+    resolve_closest(dbconf, traf, False)
     
     # Now assign resolutions to variables in the ASAS class
-    # No need to cap, since SSD implicitly caps
-    dbconf.trk  = np.arctan2(dbconf.resov[:,0], dbconf.resov[:,1]) * 180 / np.pi
-    dbconf.spd  = np.sqrt(dbconf.resov[:,0] ** 2 + dbconf.resov[:,1] ** 2)
+    # Start with current states, need a copy, otherwise it changes traf!
+    dbconf.trk = np.copy(traf.hdg)
+    dbconf.spd = np.copy(traf.gs)
+    # Calculate new track and speed
+    # No need to cap the speeds, since SSD implicitly caps
+    new_trk  = np.arctan2(dbconf.resoe, dbconf.reson) * 180 / np.pi
+    new_spd  = np.sqrt(dbconf.resoe ** 2 + dbconf.reson ** 2)
+    # Assign new track and speed for those that are in conflict
+    dbconf.trk[dbconf.inconf] = new_trk[dbconf.inconf]
+    dbconf.spd[dbconf.inconf] = new_spd[dbconf.inconf]
+    # Not sure whether this is needed...
     dbconf.vs   = traf.vs
 
 def initializeSSD(dbconf, traf):
@@ -64,7 +72,8 @@ def initializeSSD(dbconf, traf):
     dbconf.FRV          = [None] * traf.ntraf
     dbconf.ARV          = [None] * traf.ntraf
     dbconf.inconf       = np.zeros(traf.ntraf, dtype=bool)
-    dbconf.resov        = np.zeros((traf.ntraf, 2), dtype=np.float32)
+    dbconf.reson        = np.zeros(traf.ntraf, dtype=np.float32)
+    dbconf.resoe        = np.zeros(traf.ntraf, dtype=np.float32)
     dbconf.FRV_area     = np.zeros(traf.ntraf, dtype=np.float32)
     dbconf.ARV_area     = np.zeros(traf.ntraf, dtype=np.float32)
     dbconf.confmatrix   = np.zeros((traf.ntraf, traf.ntraf), dtype=bool)
@@ -229,7 +238,7 @@ def constructSSD(dbconf, traf):
 
     
 
-def resolve_closest(dbconf, traf):
+def resolve_closest(dbconf, traf, right=False):
     "Calculates closest conflict-free point"
     # It's just linalg, however credits to: http://stackoverflow.com/a/1501725
     # Variables
@@ -265,12 +274,27 @@ def resolve_closest(dbconf, traf):
             x = p[:,0] + t * q[:,0]
             y = p[:,1] + t * q[:,1]
             # Get distance squared
-            d2 = (x-gseast[i])**2 + (y-gsnorth[i])**2
+            d2 = (x - gseast[i]) ** 2 + (y - gsnorth[i]) ** 2
             # Sort distance
             ind = np.argsort(d2)
+            # Check right-turning
+            if right:
+                # Calculate angles of resolutions and in order of ind
+                # Used http://stackoverflow.com/a/16544330
+                dot = x * gseast[i]  + y * gsnorth[i]
+                det = x * gsnorth[i] - y *  gseast[i]
+                angles = np.arctan2(det, dot)
+                bool_right = angles[ind] >= 0
+                # Check if there are right-turning solutions:
+                if sum(bool_right) > 0:
+                    ind = ind[bool_right]
             # Store result in dbconf
-            dbconf.resov[i,0] = x[ind[0]]
-            dbconf.resov[i,1] = y[ind[0]]
+            dbconf.resoe[i] = x[ind[0]]
+            dbconf.reson[i] = y[ind[0]]
+            
+            # resoeval should be set to True now
+            if not dbconf.resoeval:
+                dbconf.resoeval = True
     
 def check_pyclipper():
     """ Checks whether pyclipper could be imported"""
