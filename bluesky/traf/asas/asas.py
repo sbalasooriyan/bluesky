@@ -118,9 +118,9 @@ class ASAS(DynamicArrays):
         self.LOSvmaxsev   = []
         
         # For SSD 
-        self.reson        = np.array([])               # [m/s] North resolution speed 
-        self.resoe        = np.array([])               # [m/s] East resolution speed
-        self.resoeval     = False                      # [-] Whether target resolution is calculated or not 
+        self.asasn        = np.array([])               # [m/s] North resolution speed from ASAS
+        self.asase        = np.array([])               # [m/s] East resolution speed from ASAS
+        self.asaseval     = False                      # [-] Whether target resolution is calculated or not 
         
 
     def toggle(self, flag=None):
@@ -276,17 +276,32 @@ class ASAS(DynamicArrays):
 
     def SetPrio(self, flag=None, priocode="FF1"):
         '''Set the prio switch and the type of prio '''
-        options = ["FF1", "FF2", "FF3", "LAY1", "LAY2"]
+        if self.cr_name == "SSD":
+            options = ["FF1","FF2","FF3","FF4","FF5","FF6"]
+        else:
+            options = ["FF1", "FF2", "FF3", "LAY1", "LAY2"]
         if flag is None:
-            return True, "PRIORULES [ON/OFF] [PRIOCODE]"  + \
-                         "\nAvailable priority codes: " + \
-                         "\n     FF1:  Free Flight Primary (No Prio) " + \
-                         "\n     FF2:  Free Flight Secondary (Cruising has priority)" + \
-                         "\n     FF3:  Free Flight Tertiary (Climbing/descending has priority)" + \
-                         "\n     LAY1: Layers Primary (Cruising has priority + horizontal resolutions)" + \
-                         "\n     LAY2: Layers Secondary (Climbing/descending has priority + horizontal resolutions)" + \
-                         "\nPriority is currently " + ("ON" if self.swprio else "OFF") + \
-                         "\nPriority code is currently: " + str(self.priocode)
+            if self.cr_name == "SSD":
+                return True, "PRIORULES [ON/OFF] [PRIOCODE]"  + \
+                             "\nAvailable priority codes: " + \
+                             "\n     FF1:  Shortest-way-out (No Prio) " + \
+                             "\n     FF2:  Rules-of-the-air (Right-turning solution)" + \
+                             "\n     FF3:  Rules-of-the-air (Left-turning solution)" + \
+                             "\n     FF4:  Heading first, FF2 second" + \
+                             "\n     FF5:  Velocity first, FF2 second" + \
+                             "\n     FF6:  Heading first, FF5 second" + \
+                             "\nPriority is currently " + ("ON" if self.swprio else "OFF") + \
+                             "\nPriority code is currently: " + str(self.priocode) 
+            else:
+                return True, "PRIORULES [ON/OFF] [PRIOCODE]"  + \
+                             "\nAvailable priority codes: " + \
+                             "\n     FF1:  Free Flight Primary (No Prio) " + \
+                             "\n     FF2:  Free Flight Secondary (Cruising has priority)" + \
+                             "\n     FF3:  Free Flight Tertiary (Climbing/descending has priority)" + \
+                             "\n     LAY1: Layers Primary (Cruising has priority + horizontal resolutions)" + \
+                             "\n     LAY2: Layers Secondary (Climbing/descending has priority + horizontal resolutions)" + \
+                             "\nPriority is currently " + ("ON" if self.swprio else "OFF") + \
+                             "\nPriority code is currently: " + str(self.priocode)
         self.swprio = flag
         if priocode not in options:
             return False, "Priority code Not Understood. Available Options: " + str(options)
@@ -341,6 +356,7 @@ class ASAS(DynamicArrays):
         self.spd[-n:] = self.traf.tas[-n:]
         self.alt[-n:] = self.traf.alt[-n:]
 
+
     def update(self, simt):
         iconf0 = np.array(self.iconf)
         
@@ -353,6 +369,11 @@ class ASAS(DynamicArrays):
             # Conflict detection and resolution
             self.cd.detect(self, self.traf, simt)
             self.cr.resolve(self, self.traf)
+            
+            if 0:
+                matrix = (self.traf.gseast,self.traf.gsnorth,self.asase,self.asasn,self.inconf,self.traf.hdg,self.traf.gs,self.trk,self.spd)
+                header = ["GSPD_E","GSPD_N","ASAS_E","ASAS_N","INCONF","HEADING","SPEED","ASAS_TRK","ASAS_SPD"]
+                print self.format_matrix(header,self.traf.id,np.transpose(np.vstack(matrix)).tolist(),"{:^{}}","{:<{}}","{:>{}.1f}","\n"," | ",self.tasas)
 
         # Change labels in interface
         if settings.gui == "pygame":
@@ -371,3 +392,22 @@ class ASAS(DynamicArrays):
             output = 'Could not import pyclipper, RESO SSD will not function'
 
         return output
+        
+
+    def format_matrix(self, header, rownames, matrix, top_format, left_format, cell_format, row_delim, col_delim, topleft=''):
+        table = [[str(topleft)] + header] + [[name] + row for name, row in zip(rownames, matrix)]
+        table_format = [['{:^{}}'] + len(header) * [top_format]] \
+                     + len(matrix) * [[left_format] + len(header) * [cell_format]]
+        col_widths = [max(
+                          len(format.format(cell, 0))
+                          for format, cell in zip(col_format, col))
+                      for col_format, col in zip(zip(*table_format), zip(*table))]
+        return row_delim.join(
+                   col_delim.join(
+                       format.format(cell, width)
+                       for format, cell, width in zip(row_format, row, col_widths))
+                   for row_format, row in zip(table_format, table))
+        
+
+
+

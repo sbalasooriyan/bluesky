@@ -243,7 +243,6 @@ void main()
 	// 
 	if (gs_in[0].int_id == n_ac - 1) {
 		float dreso = gs_in[0].reso[0] * gs_in[0].reso[0] + gs_in[0].reso[1] * gs_in[0].reso[1];
-		// float dreso = 10587.0;
 		if (dreso > Vlimits[0]) {
 			color_fs = vec4(1.0, 1.0, 0.0, 1.0);
 			

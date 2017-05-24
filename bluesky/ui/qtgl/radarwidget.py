@@ -48,7 +48,7 @@ yellow                = (255, 255, 0)
 
 VERTEX_IS_LATLON, VERTEX_IS_METERS, VERTEX_IS_SCREEN = range(3)
 ATTRIB_VERTEX, ATTRIB_TEXCOORDS, ATTRIB_LAT, ATTRIB_LON, ATTRIB_ORIENTATION, ATTRIB_COLOR, ATTRIB_TEXDEPTH = range(7)
-ATTRIB_LAT0, ATTRIB_LON0, ATTRIB_ALT0, ATTRIB_TAS0, ATTRIB_TRK0, ATTRIB_LAT1, ATTRIB_LON1, ATTRIB_ALT1, ATTRIB_TAS1, ATTRIB_TRK1, ATTRIB_RESON, ATTRIB_RESOE = range(12)
+ATTRIB_LAT0, ATTRIB_LON0, ATTRIB_ALT0, ATTRIB_TAS0, ATTRIB_TRK0, ATTRIB_LAT1, ATTRIB_LON1, ATTRIB_ALT1, ATTRIB_TAS1, ATTRIB_TRK1, ATTRIB_ASASN, ATTRIB_ASASE = range(12)
 
 
 class nodeData(object):
@@ -145,7 +145,8 @@ class RadarWidget(QGLWidget):
         self.show_coast     = True
         self.show_traf      = True
         self.show_pz        = False
-        self.show_lbl       = True
+        #self.show_lbl       = True
+        self.show_lbl       = False
         self.show_wpt       = 1
         self.show_apt       = 1
 
@@ -224,8 +225,8 @@ class RadarWidget(QGLWidget):
         self.aclblbuf      = create_empty_buffer(MAX_NAIRCRAFT * 24, usage=gl.GL_STREAM_DRAW)
         self.confcpabuf    = create_empty_buffer(MAX_NCONFLICTS * 16, usage=gl.GL_STREAM_DRAW)
         self.trailbuf      = create_empty_buffer(MAX_TRAILLEN * 16, usage=gl.GL_STREAM_DRAW)
-        self.resonbuf      = create_empty_buffer(MAX_NAIRCRAFT * 4, usage=gl.GL_STREAM_DRAW)
-        self.resoebuf      = create_empty_buffer(MAX_NAIRCRAFT * 4, usage=gl.GL_STREAM_DRAW)
+        self.asasnbuf      = create_empty_buffer(MAX_NAIRCRAFT * 4, usage=gl.GL_STREAM_DRAW)
+        self.asasebuf      = create_empty_buffer(MAX_NAIRCRAFT * 4, usage=gl.GL_STREAM_DRAW)
 
         self.polyprevbuf   = create_empty_buffer(MAX_POLYPREV_SEGMENTS * 8, usage=gl.GL_DYNAMIC_DRAW)
         self.allpolysbuf   = create_empty_buffer(MAX_ALLPOLYS_SEGMENTS * 16, usage=gl.GL_DYNAMIC_DRAW)
@@ -274,8 +275,8 @@ class RadarWidget(QGLWidget):
         self.ssd.bind_attrib(ATTRIB_ALT1, 1, self.acaltbuf)
         self.ssd.bind_attrib(ATTRIB_TAS1, 1, self.actasbuf)
         self.ssd.bind_attrib(ATTRIB_TRK1, 1, self.achdgbuf)
-        self.ssd.bind_attrib(ATTRIB_RESON, 1, self.resonbuf, instance_divisor=1)
-        self.ssd.bind_attrib(ATTRIB_RESOE, 1, self.resoebuf, instance_divisor=1)
+        self.ssd.bind_attrib(ATTRIB_ASASN, 1, self.asasnbuf, instance_divisor=1)
+        self.ssd.bind_attrib(ATTRIB_ASASE, 1, self.asasebuf, instance_divisor=1)
 
         # ------- Protected Zone -------------------------
         circlevertices = np.transpose(np.array((2.5 * nm * np.cos(np.linspace(0.0, 2.0 * np.pi, self.vcount_circle)), 2.5 * nm * np.sin(np.linspace(0.0, 2.0 * np.pi, self.vcount_circle))), dtype=np.float32))
@@ -503,7 +504,9 @@ class RadarWidget(QGLWidget):
 
         # Draw traffic symbols
         if self.naircraft > 0 and self.show_traf:
-            self.rwaypoints.draw(n_instances=self.routelbl.n_instances)
+            ## SUBA
+            if self.show_lbl:
+                self.rwaypoints.draw(n_instances=self.routelbl.n_instances)
             self.ac_symbol.draw(n_instances=self.naircraft)
 #            self.ssdtarget.draw(n_instances=self.naircraft)
 
@@ -659,9 +662,8 @@ class RadarWidget(QGLWidget):
             update_buffer(self.achdgbuf, np.array(data.trk, dtype=np.float32))
             update_buffer(self.acaltbuf, np.array(data.alt, dtype=np.float32))
             update_buffer(self.actasbuf, np.array(data.tas, dtype=np.float32))
-            update_buffer(self.resonbuf, np.array(data.reson, dtype=np.float32))
-            update_buffer(self.resoebuf, np.array(data.resoe, dtype=np.float32))
-#            print data.reson**2 + data.resoe**2 > (200./3600*1852)**2
+            update_buffer(self.asasnbuf, np.array(data.asasn, dtype=np.float32))
+            update_buffer(self.asasebuf, np.array(data.asase, dtype=np.float32))
 
             # CPA lines to indicate conflicts
             ncpalines = len(data.confcpalat)

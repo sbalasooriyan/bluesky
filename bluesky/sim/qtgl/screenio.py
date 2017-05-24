@@ -86,18 +86,9 @@ class ScreenIO(QObject):
     def suba(self, cmd_text):
         if self.manager.isActive():
             # Check whether first four letters are "exec"
-            if cmd_text[:3] == 'FUN':
-                cmd_text = cmd_text[3:] + '()'
-            if cmd_text[:4] == 'VARS':
-                cmd_text = 'VARS(' + cmd_text[4:] + ')'
             if cmd_text[:4] == 'EXEC':
                 # Execute custom things
                 output = SSD_dump.test_fun(self.sim.traf)
-                if not type(output) == 'str':
-                    output = str(output)
-            if cmd_text[:4] == 'EXES':
-                # Execute custom things
-                output = SSD.test_fun()
                 if not type(output) == 'str':
                     output = str(output)
             else:
@@ -294,12 +285,12 @@ class ScreenIO(QObject):
             data.confcpalon = self.sim.traf.asas.lonowncpa
             data.trk        = self.sim.traf.hdg
             # If resolution is evaluated, else send zeros
-            if self.sim.traf.asas.resoeval:
-                data.reson  = self.sim.traf.asas.reson
-                data.resoe  = self.sim.traf.asas.resoe
+            if self.sim.traf.asas.asaseval:
+                data.asasn  = self.sim.traf.asas.asasn
+                data.asase  = self.sim.traf.asas.asase
             else:
-                data.reson  = np.zeros(self.sim.traf.ntraf, dtype=np.float32)
-                data.resoe  = np.zeros(self.sim.traf.ntraf, dtype=np.float32)
+                data.asasn  = np.zeros(self.sim.traf.ntraf, dtype=np.float32)
+                data.asase  = np.zeros(self.sim.traf.ntraf, dtype=np.float32)
 
             # Trails, send only new line segments to be added            
             data.swtrails  = self.sim.traf.trails.active 
