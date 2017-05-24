@@ -47,10 +47,22 @@ def resolve(dbconf, traf):
     initializeSSD(dbconf, traf)
     
     # Construct the SSD
-    constructSSD(dbconf, traf)
+    constructSSD(dbconf, traf, dbconf.priocode)
     
-    # Get resolved speed-vector (True/False for right-turning solution)
-    resolve_closest(dbconf, traf, False)
+    # Check what CD-method is used
+    if not dbconf.cd_name == "SSD":
+        # Use STATEBASED CD then
+        dbconf.inconf = np.array([len(ids) > 0 for ids in dbconf.iconf])
+    
+    # Get resolved speed-vector
+    if dbconf.priocode == "FF1":
+        resolve_closest(dbconf, traf, 0)        # Shortest-way-out
+    elif dbconf.priocode == "FF2":
+        resolve_closest(dbconf, traf, 1)        # Right-turning
+    elif dbconf.priocode == "FF3":
+        resolve_closest(dbconf, traf, 2)        # Left-turning
+        
+            
     
     # Now assign resolutions to variables in the ASAS class
     # Start with current states, need a copy, otherwise it changes traf!
@@ -58,8 +70,9 @@ def resolve(dbconf, traf):
     dbconf.spd = np.copy(traf.gs)
     # Calculate new track and speed
     # No need to cap the speeds, since SSD implicitly caps
-    new_trk  = np.arctan2(dbconf.resoe, dbconf.reson) * 180 / np.pi
-    new_spd  = np.sqrt(dbconf.resoe ** 2 + dbconf.reson ** 2)
+    new_trk  = np.arctan2(dbconf.asase, dbconf.asasn) * 180 / np.pi
+    new_spd  = np.sqrt(dbconf.asase ** 2 + dbconf.asasn ** 2)
+    
     # Assign new track and speed for those that are in conflict
     dbconf.trk[dbconf.inconf] = new_trk[dbconf.inconf]
     dbconf.spd[dbconf.inconf] = new_spd[dbconf.inconf]
@@ -71,9 +84,11 @@ def initializeSSD(dbconf, traf):
     # Need to do it here, since ASAS.reset doesn't know ntraf
     dbconf.FRV          = [None] * traf.ntraf
     dbconf.ARV          = [None] * traf.ntraf
+    # For calculation purposes
+    dbconf.ARV_calc     = [None] * traf.ntraf
     dbconf.inconf       = np.zeros(traf.ntraf, dtype=bool)
-    dbconf.reson        = np.zeros(traf.ntraf, dtype=np.float32)
-    dbconf.resoe        = np.zeros(traf.ntraf, dtype=np.float32)
+    dbconf.asasn        = np.zeros(traf.ntraf, dtype=np.float32)
+    dbconf.asase        = np.zeros(traf.ntraf, dtype=np.float32)
     dbconf.FRV_area     = np.zeros(traf.ntraf, dtype=np.float32)
     dbconf.ARV_area     = np.zeros(traf.ntraf, dtype=np.float32)
     dbconf.confmatrix   = np.zeros((traf.ntraf, traf.ntraf), dtype=bool)
@@ -92,7 +107,7 @@ def area(vset):
     return A
 
 # dbconf is an object of the ASAS class defined in asas.py
-def constructSSD(dbconf, traf):
+def constructSSD(dbconf, traf, priocode = "FF1"):
     """ Calculates the FRV and ARV of the SSD """
     output = ''
     # Parameters
@@ -102,7 +117,9 @@ def constructSSD(dbconf, traf):
     vmin    = 200. / 3600. * nm     # [m/s] Manual definition
     vmax    = 600. / 3600. * nm     # [m/s] Manual definition
     hsep    = dbconf.R              # [m] Horizontal separation (5 NM)
-    sepfact = 1.05
+    margin  = dbconf.mar            # [-] Safety margin for evasion
+    hsepm   = hsep * margin         # [m] Horizontal separation with safety margin
+    alpham  = 0.4999 * np.pi        # [rad] Maximum half-angle for VO
     
     # Relevant info from traf
     gsnorth = traf.gsnorth
@@ -110,6 +127,7 @@ def constructSSD(dbconf, traf):
     lat     = traf.lat
     lon     = traf.lon
     ntraf   = traf.ntraf
+    hdg     = traf.hdg
     
     # If no traffic
     if ntraf == 0:
@@ -147,12 +165,15 @@ def constructSSD(dbconf, traf):
     dist = dist * nm
     
     # In LoS the VO can't be defined, act as if dist is on edge
-    dist[dist < hsep] = hsep
+    dist[dist < hsepm] = hsepm
     
     # Calculate vertices of Velocity Obstacle (CCW)
     # These are still in relative velocity space, see derivation in appendix
     # Half-angle of the Velocity obstacle [rad]
-    alpha = np.arcsin(hsep * sepfact / dist)
+    # Include safety margin
+    alpha = np.arcsin(hsepm / dist)
+    # Limit half-angle alpha to 89.982 deg. Ensures that VO can be constructed
+    alpha[alpha > alpham] = alpham
     # Relevant sin/cos/tan
     sinqdr = np.sin(qdr)
     cosqdr = np.cos(qdr)
@@ -174,6 +195,7 @@ def constructSSD(dbconf, traf):
     # Map them into the format pyclipper wants. Outercircle CCW, innercircle CW
     circle = (tuple(map(tuple, np.flipud(xyc * vmax))), tuple(map(tuple , xyc * vmin)))
     
+
     # Calculate SSD for every aircraft (See formulas appendix)
     for i in range(ntraf):
         # SSD for aircraft i
@@ -210,10 +232,20 @@ def constructSSD(dbconf, traf):
             # Returns 0 if false, -1 if pt is on poly and +1 if pt is in poly.
             if pyclipper.PointInPolygon(pyclipper.scale_to_clipper((gseast[i],gsnorth[i])),VO):
                 dbconf.confmatrix[i,i_other[j]] = True
+                
+        
             
         # Execute clipper command
         FRV = pyclipper.scale_from_clipper(pc.Execute(pyclipper.CT_INTERSECTION, pyclipper.PFT_NONZERO, pyclipper.PFT_NONZERO))
-        ARV = pyclipper.scale_from_clipper(pc.Execute(pyclipper.CT_DIFFERENCE, pyclipper.PFT_NONZERO, pyclipper.PFT_NONZERO))
+        ARV = pc.Execute(pyclipper.CT_DIFFERENCE, pyclipper.PFT_NONZERO, pyclipper.PFT_NONZERO)
+        if not priocode == "FF1":
+            # Make another clipper object for extra intersections
+            pc2 = pyclipper.Pyclipper()
+            # Put the ARV in there
+            pc2.AddPaths(ARV, pyclipper.PT_CLIP, True)
+        # Scale back
+        ARV = pyclipper.scale_from_clipper(ARV)
+        
         # Check multi exteriors, if this layer is not a list, it means it has no exteriors
         if not type(FRV[0][0]) == list:
             FRV = [FRV]
@@ -228,21 +260,53 @@ def constructSSD(dbconf, traf):
         # Temporary
         dbconf.f = dbconf.FRV_area
         dbconf.a = dbconf.ARV_area
-    # Update inconf
-    dbconf.inconf = np.sum(dbconf.confmatrix, axis=0) > 0
+        
+        # For resolution purposes sometimes extra intersections are wanted
+        if not priocode == "FF1":
+            # Make a box that covers right or left of SSD
+            own_hdg = hdg[i] * np.pi / 180
+            # Efficient calculation of box, see notes
+            if priocode == "FF2":
+                # CW or right-turning
+                sin_table = np.array([[1,0],[-1,0],[-1,-1],[1,-1]], dtype=np.float64)
+                cos_table = np.array([[0,1],[0,-1],[1,-1],[1,1]], dtype=np.float64)
+            else:
+                # CCW or left-turning
+                sin_table = np.array([[1,0],[1,1],[-1,1],[-1,0]], dtype=np.float64)
+                cos_table = np.array([[0,1],[-1,1],[-1,-1],[0,-1]], dtype=np.float64)
+            # Normalized coordinates of box
+            xyb = np.sin(own_hdg) * sin_table + np.cos(own_hdg) * cos_table
+            # Scale with vmax (and some factor) and put in tuple
+            box = pyclipper.scale_to_clipper(map(tuple, 1.1 * vmax * xyb))
+            pc2.AddPath(box, pyclipper.PT_SUBJECT, True)
+            # Execute clipper command
+            ARV_calc = pyclipper.scale_from_clipper(pc2.Execute(pyclipper.CT_INTERSECTION, pyclipper.PFT_NONZERO, pyclipper.PFT_NONZERO))
+            
+            if not type(ARV_calc[0][0]) == list:
+                ARV_calc = [ARV_calc]
+        # Shortest way out prio, so use full SSD (ARV_calc = ARV)
+        else:
+            ARV_calc = ARV
+        # Update calculatable ARV for resolutions
+        dbconf.ARV_calc[i] = ARV_calc
+        
+    # Update inconf if CD is set to SSD
+    if dbconf.cd_name == "SSD":
+        dbconf.inconf = np.sum(dbconf.confmatrix, axis=0) > 0
         
 #    dump([hsep,vmin,vmax,gsnorth,gseast,lat,lon,ntraf,dbconf.FRV,dbconf.ARV])
     output += 'hoi'
     return output
+        
 
 
     
 
-def resolve_closest(dbconf, traf, right=False):
+def resolve_closest(dbconf, traf, priocode):
     "Calculates closest conflict-free point"
     # It's just linalg, however credits to: http://stackoverflow.com/a/1501725
     # Variables
-    ARV     = dbconf.ARV
+    ARV     = dbconf.ARV_calc
     gsnorth = traf.gsnorth
     gseast  = traf.gseast
     ntraf   = traf.ntraf
@@ -277,24 +341,35 @@ def resolve_closest(dbconf, traf, right=False):
             d2 = (x - gseast[i]) ** 2 + (y - gsnorth[i]) ** 2
             # Sort distance
             ind = np.argsort(d2)
+            
+# NOW HANDLED BY ARV_calc!!
             # Check right-turning
-            if right:
-                # Calculate angles of resolutions and in order of ind
-                # Used http://stackoverflow.com/a/16544330
-                dot = x * gseast[i]  + y * gsnorth[i]
-                det = x * gsnorth[i] - y *  gseast[i]
-                angles = np.arctan2(det, dot)
-                bool_right = angles[ind] >= 0
-                # Check if there are right-turning solutions:
-                if sum(bool_right) > 0:
-                    ind = ind[bool_right]
+#            if priocode > 0:
+#                # Calculate angles of resolutions and in order of ind
+#                # Used http://stackoverflow.com/a/16544330
+#                dot = x * gseast[i]  + y * gsnorth[i]
+#                det = x * gsnorth[i] - y *  gseast[i]
+#                angles = np.arctan2(det, dot)
+#                # Check right/left-turning
+#                if priocode == 1:
+#                    bool_right = angles[ind] >= 0
+#                else:                    
+#                    bool_right = angles[ind] <= 0
+#                # Check if there are right-turning solutions:
+#                if sum(bool_right) > 0:
+#                    ind = ind[bool_right]
+            
             # Store result in dbconf
-            dbconf.resoe[i] = x[ind[0]]
-            dbconf.reson[i] = y[ind[0]]
+            dbconf.asase[i] = x[ind[0]]
+            dbconf.asasn[i] = y[ind[0]]
             
             # resoeval should be set to True now
-            if not dbconf.resoeval:
-                dbconf.resoeval = True
+            if not dbconf.asaseval:
+                dbconf.asaseval = True
+        # Those that are not in conflict will be assigned zeros
+        else:
+            dbconf.asase[i] = 0.
+            dbconf.asasn[i] = 0.
     
 def check_pyclipper():
     """ Checks whether pyclipper could be imported"""
