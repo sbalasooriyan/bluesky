@@ -55,13 +55,8 @@ def resolve(dbconf, traf):
         dbconf.inconf = np.array([len(ids) > 0 for ids in dbconf.iconf])
     
     # Get resolved speed-vector
-    if dbconf.priocode == "FF1":
-        resolve_closest(dbconf, traf, 0)        # Shortest-way-out
-    elif dbconf.priocode == "FF2":
-        resolve_closest(dbconf, traf, 1)        # Right-turning
-    elif dbconf.priocode == "FF3":
-        resolve_closest(dbconf, traf, 2)        # Left-turning
-        
+    if dbconf.priocode == "FF1" or dbconf.priocode == "FF2" or dbconf.priocode == "FF4" or dbconf.priocode == "FF7":
+        resolve_closest(dbconf, traf)
             
     
     # Now assign resolutions to variables in the ASAS class
@@ -262,7 +257,7 @@ def constructSSD(dbconf, traf, priocode = "FF1"):
         dbconf.a = dbconf.ARV_area
         
         # For resolution purposes sometimes extra intersections are wanted
-        if not priocode == "FF1":
+        if priocode == "FF2" or priocode == "FF7":
             # Make a box that covers right or left of SSD
             own_hdg = hdg[i] * np.pi / 180
             # Efficient calculation of box, see notes
@@ -270,7 +265,7 @@ def constructSSD(dbconf, traf, priocode = "FF1"):
                 # CW or right-turning
                 sin_table = np.array([[1,0],[-1,0],[-1,-1],[1,-1]], dtype=np.float64)
                 cos_table = np.array([[0,1],[0,-1],[1,-1],[1,1]], dtype=np.float64)
-            else:
+            elif priocode == "FF7":
                 # CCW or left-turning
                 sin_table = np.array([[1,0],[1,1],[-1,1],[-1,0]], dtype=np.float64)
                 cos_table = np.array([[0,1],[-1,1],[-1,-1],[0,-1]], dtype=np.float64)
@@ -302,13 +297,18 @@ def constructSSD(dbconf, traf, priocode = "FF1"):
 
     
 
-def resolve_closest(dbconf, traf, priocode):
+def resolve_closest(dbconf, traf):
     "Calculates closest conflict-free point"
     # It's just linalg, however credits to: http://stackoverflow.com/a/1501725
     # Variables
     ARV     = dbconf.ARV_calc
-    gsnorth = traf.gsnorth
-    gseast  = traf.gseast
+    # Select AP-setting as point
+    if dbconf.priocode == "FF4":
+        gsnorth = np.cos(traf.ap.trk / 180 * np.pi) * traf.ap.tas
+        gseast = np.sin(traf.ap.trk / 180 * np.pi) * traf.ap.tas
+    else:
+        gsnorth = traf.gsnorth
+        gseast  = traf.gseast
     ntraf   = traf.ntraf
     
     # Loop through SSDs of all aircraft
