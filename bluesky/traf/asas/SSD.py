@@ -115,6 +115,7 @@ def constructSSD(dbconf, traf, priocode = "FF1"):
     margin  = dbconf.mar            # [-] Safety margin for evasion
     hsepm   = hsep * margin         # [m] Horizontal separation with safety margin
     alpham  = 0.4999 * np.pi        # [rad] Maximum half-angle for VO
+    adsbmax = 200 * 1000            # [m] Maximum ADS-B range
     
     # Relevant info from traf
     gsnorth = traf.gsnorth
@@ -124,22 +125,28 @@ def constructSSD(dbconf, traf, priocode = "FF1"):
     ntraf   = traf.ntraf
     hdg     = traf.hdg
     
+        
+    # # Use velocity limits for the ring-shaped part of the SSD
+    # Discretize the circles using points on circle
+    angles = np.arange(0, 2 * np.pi, 2 * np.pi / N_angle)
+    # Put points of unit-circle in a (180x2)-array (CW)
+    xyc = np.transpose(np.reshape(np.concatenate((np.sin(angles), np.cos(angles))), (2, N_angle)))
+    # Map them into the format pyclipper wants. Outercircle CCW, innercircle CW
+    circle_tup = (tuple(map(tuple, np.flipud(xyc * vmax))), tuple(map(tuple , xyc * vmin)))
+    circle_lst = [list(map(list, np.flipud(xyc * vmax))), list(map(list , xyc * vmin))]
+    
     # If no traffic
     if ntraf == 0:
         return
     
     # If only one aircraft
     elif ntraf == 1:
-###     # Discretize the circles using points on circle
-        angles = np.arange(0, 2 * np.pi, 2 * np.pi / N_angle)
-###     # Put points of unit-circle in a (180x2)-array (CW)
-        xyc = np.transpose(np.reshape(np.concatenate((np.sin(angles), np.cos(angles))), (2, N_angle)))
         # Map them into the format ARV wants. Outercircle CCW, innercircle CW
-        dbconf.ARV[0] = [list(map(list, np.flipud(xyc * vmax))), list(map(list , xyc * vmin))]
+        dbconf.ARV[0] = circle_lst
         dbconf.FRV[0] = []
         # Calculate areas and store in dbconf
-        dbconf.FRV_area = 0
-        dbconf.ARV_area = np.pi * (vmax **2 - vmin ** 2)
+        dbconf.FRV_area[0] = 0
+        dbconf.ARV_area[0] = np.pi * (vmax **2 - vmin ** 2)
         return
         
     # Function qdrdist_matrix needs 4 vectors as input (lat1,lon1,lat2,lon2)
@@ -182,108 +189,118 @@ def constructSSD(dbconf, traf, priocode = "FF1"):
     y1 = (cosqdr - sinqdrtanalpha) * 2 * vmax
     y2 = (cosqdr + sinqdrtanalpha) * 2 * vmax
     
-    # Use velocity limits for the ring-shaped part
-### # Discretize the circles using points on circle
-    angles = np.arange(0, 2 * np.pi, 2 * np.pi / N_angle)
-### # Put points of unit-circle in a (180x2)-array (CW)
-    xyc = np.transpose(np.reshape(np.concatenate((np.sin(angles), np.cos(angles))), (2, N_angle)))
-    # Map them into the format pyclipper wants. Outercircle CCW, innercircle CW
-    circle = (tuple(map(tuple, np.flipud(xyc * vmax))), tuple(map(tuple , xyc * vmin)))
     
-
     # Calculate SSD for every aircraft (See formulas appendix)
     for i in range(ntraf):
         # SSD for aircraft i
         # Get indices that belong to aircraft i
-        ind = np.logical_or(ind1 == i,ind2 == i)
-        # The i's of the other aircraft
-        i_other = np.delete(np.arange(0, ntraf), i)
-        # VO from 2 to 1 is mirror of 1 to 2. Only 1 to 2 can be constructed in
-        # this manner, so need a correction vector that will mirror the VO
-        fix = np.ones(np.shape(i_other))
-        fix[i_other < i] = -1
-        
-        # Get vertices in an x- and y-array of size (ntraf-1)*3x1
-        x = np.concatenate((gseast[i_other],
-                            x1[ind] * fix + gseast[i_other],
-                            x2[ind] * fix + gseast[i_other]))
-        y = np.concatenate((gsnorth[i_other],
-                            y1[ind] * fix + gsnorth[i_other],
-                            y2[ind] * fix + gsnorth[i_other]))
-        # Reshape [(ntraf-1)x3] and put arrays in one array [(ntraf-1)x3x2]
-        x = np.transpose(x.reshape(3, np.shape(i_other)[0]))
-        y = np.transpose(y.reshape(3, np.shape(i_other)[0])) 
-        xy = np.dstack((x,y))
-        
-        # Make a clipper object
-        pc = pyclipper.Pyclipper()
-        # Add circles (ring-shape) to clipper as subject
-        pc.AddPaths(pyclipper.scale_to_clipper(circle), pyclipper.PT_SUBJECT, True)
-        # Add each other other aircraft to clipper as clip
-        for j in range(np.shape(i_other)[0]):
-            VO = pyclipper.scale_to_clipper(map(tuple,xy[j,:,:]))
-            pc.AddPath(VO, pyclipper.PT_CLIP, True)
-            # Detect conflicts, store in confmatrix
-            # Returns 0 if false, -1 if pt is on poly and +1 if pt is in poly.
-            if pyclipper.PointInPolygon(pyclipper.scale_to_clipper((gseast[i],gsnorth[i])),VO):
-                dbconf.confmatrix[i,i_other[j]] = True
-                
-        
-            
-        # Execute clipper command
-        FRV = pyclipper.scale_from_clipper(pc.Execute(pyclipper.CT_INTERSECTION, pyclipper.PFT_NONZERO, pyclipper.PFT_NONZERO))
-        ARV = pc.Execute(pyclipper.CT_DIFFERENCE, pyclipper.PFT_NONZERO, pyclipper.PFT_NONZERO)
-        if not priocode == "FF1":
-            # Make another clipper object for extra intersections
-            pc2 = pyclipper.Pyclipper()
-            # Put the ARV in there
-            pc2.AddPaths(ARV, pyclipper.PT_CLIP, True)
-        # Scale back
-        ARV = pyclipper.scale_from_clipper(ARV)
-        
-        # Check multi exteriors, if this layer is not a list, it means it has no exteriors
-        if not type(FRV[0][0]) == list:
-            FRV = [FRV]
-        if not type(ARV[0][0]) == list:
-            ARV = [ARV]
-        # Store in dbconf 
-        dbconf.FRV[i] = FRV
-        dbconf.ARV[i] = ARV
-        # Calculate areas and store in dbconf
-        dbconf.FRV_area[i] = area(FRV)
-        dbconf.ARV_area[i] = area(ARV)
-        # Temporary
-        dbconf.f = dbconf.FRV_area
-        dbconf.a = dbconf.ARV_area
-        
-        # For resolution purposes sometimes extra intersections are wanted
-        if priocode == "FF2" or priocode == "FF7":
-            # Make a box that covers right or left of SSD
-            own_hdg = hdg[i] * np.pi / 180
-            # Efficient calculation of box, see notes
-            if priocode == "FF2":
-                # CW or right-turning
-                sin_table = np.array([[1,0],[-1,0],[-1,-1],[1,-1]], dtype=np.float64)
-                cos_table = np.array([[0,1],[0,-1],[1,-1],[1,1]], dtype=np.float64)
-            elif priocode == "FF7":
-                # CCW or left-turning
-                sin_table = np.array([[1,0],[1,1],[-1,1],[-1,0]], dtype=np.float64)
-                cos_table = np.array([[0,1],[-1,1],[-1,-1],[0,-1]], dtype=np.float64)
-            # Normalized coordinates of box
-            xyb = np.sin(own_hdg) * sin_table + np.cos(own_hdg) * cos_table
-            # Scale with vmax (and some factor) and put in tuple
-            box = pyclipper.scale_to_clipper(map(tuple, 1.1 * vmax * xyb))
-            pc2.AddPath(box, pyclipper.PT_SUBJECT, True)
-            # Execute clipper command
-            ARV_calc = pyclipper.scale_from_clipper(pc2.Execute(pyclipper.CT_INTERSECTION, pyclipper.PFT_NONZERO, pyclipper.PFT_NONZERO))
-            
-            if not type(ARV_calc[0][0]) == list:
-                ARV_calc = [ARV_calc]
-        # Shortest way out prio, so use full SSD (ARV_calc = ARV)
+        ind = np.where(np.logical_or(ind1 == i,ind2 == i))[0]
+        # Check whether there are any aircraft in the vicinity
+        if len(ind) == 0:
+            # No aircraft in the vicinity
+            # Map them into the format ARV wants. Outercircle CCW, innercircle CW
+            dbconf.ARV[i] = circle_lst
+            dbconf.FRV[i] = []
+            # Calculate areas and store in dbconf
+            dbconf.FRV_area[i] = 0
+            dbconf.ARV_area[i] = np.pi * (vmax **2 - vmin ** 2)
         else:
-            ARV_calc = ARV
-        # Update calculatable ARV for resolutions
-        dbconf.ARV_calc[i] = ARV_calc
+            # The i's of the other aircraft
+            i_other = np.delete(np.arange(0, ntraf), i)
+            # Aircraft that are within ADS-B range
+            ac_adsb = np.where(dist[ind] < adsbmax)[0]
+            # Now account for ADS-B range in indices of other aircraft (i_other)
+            ind = ind[ac_adsb]
+            i_other = i_other[ac_adsb]
+            # Distances between aircraft pairs
+            dist_pair = dist[ind]
+            # VO from 2 to 1 is mirror of 1 to 2. Only 1 to 2 can be constructed in
+            # this manner, so need a correction vector that will mirror the VO
+            fix = np.ones(np.shape(i_other))
+            fix[i_other < i] = -1
+            
+            # Get vertices in an x- and y-array of size (ntraf-1)*3x1
+            x = np.concatenate((gseast[i_other],
+                                x1[ind] * fix + gseast[i_other],
+                                x2[ind] * fix + gseast[i_other]))
+            y = np.concatenate((gsnorth[i_other],
+                                y1[ind] * fix + gsnorth[i_other],
+                                y2[ind] * fix + gsnorth[i_other]))
+            # Reshape [(ntraf-1)x3] and put arrays in one array [(ntraf-1)x3x2]
+            x = np.transpose(x.reshape(3, np.shape(i_other)[0]))
+            y = np.transpose(y.reshape(3, np.shape(i_other)[0])) 
+            xy = np.dstack((x,y))
+            
+            # Make a clipper object
+            pc = pyclipper.Pyclipper()
+            # Add circles (ring-shape) to clipper as subject
+            pc.AddPaths(pyclipper.scale_to_clipper(circle_tup), pyclipper.PT_SUBJECT, True)
+            # Add each other other aircraft to clipper as clip
+            for j in range(np.shape(i_other)[0]):
+                VO = pyclipper.scale_to_clipper(map(tuple,xy[j,:,:]))
+                print "AC0" + str(i) + " - AC0" + str(i_other[j])
+                print dist_pair[j]
+                pc.AddPath(VO, pyclipper.PT_CLIP, True)
+                # Detect conflicts, store in confmatrix
+                # Returns 0 if false, -1 if pt is on poly and +1 if pt is in poly.
+                if pyclipper.PointInPolygon(pyclipper.scale_to_clipper((gseast[i],gsnorth[i])),VO):
+                    dbconf.confmatrix[i,i_other[j]] = True
+                    
+            
+                
+            # Execute clipper command
+            FRV = pyclipper.scale_from_clipper(pc.Execute(pyclipper.CT_INTERSECTION, pyclipper.PFT_NONZERO, pyclipper.PFT_NONZERO))
+            ARV = pc.Execute(pyclipper.CT_DIFFERENCE, pyclipper.PFT_NONZERO, pyclipper.PFT_NONZERO)
+            if not priocode == "FF1":
+                # Make another clipper object for extra intersections
+                pc2 = pyclipper.Pyclipper()
+                # Put the ARV in there
+                pc2.AddPaths(ARV, pyclipper.PT_CLIP, True)
+            # Scale back
+            ARV = pyclipper.scale_from_clipper(ARV)
+            
+            # Check multi exteriors, if this layer is not a list, it means it has no exteriors
+            # In that case, make it a list, such that its format is consistent with further code
+    #        print i
+            if not type(FRV[0][0]) == list:
+                FRV = [FRV]
+            if not type(ARV[0][0]) == list:
+                ARV = [ARV]
+            # Store in dbconf 
+            dbconf.FRV[i] = FRV
+            dbconf.ARV[i] = ARV
+            # Calculate areas and store in dbconf
+            dbconf.FRV_area[i] = area(FRV)
+            dbconf.ARV_area[i] = area(ARV)
+        
+            # For resolution purposes sometimes extra intersections are wanted
+            if priocode == "FF2" or priocode == "FF7":
+                # Make a box that covers right or left of SSD
+                own_hdg = hdg[i] * np.pi / 180
+                # Efficient calculation of box, see notes
+                if priocode == "FF2":
+                    # CW or right-turning
+                    sin_table = np.array([[1,0],[-1,0],[-1,-1],[1,-1]], dtype=np.float64)
+                    cos_table = np.array([[0,1],[0,-1],[1,-1],[1,1]], dtype=np.float64)
+                elif priocode == "FF7":
+                    # CCW or left-turning
+                    sin_table = np.array([[1,0],[1,1],[-1,1],[-1,0]], dtype=np.float64)
+                    cos_table = np.array([[0,1],[-1,1],[-1,-1],[0,-1]], dtype=np.float64)
+                # Normalized coordinates of box
+                xyb = np.sin(own_hdg) * sin_table + np.cos(own_hdg) * cos_table
+                # Scale with vmax (and some factor) and put in tuple
+                box = pyclipper.scale_to_clipper(map(tuple, 1.1 * vmax * xyb))
+                pc2.AddPath(box, pyclipper.PT_SUBJECT, True)
+                # Execute clipper command
+                ARV_calc = pyclipper.scale_from_clipper(pc2.Execute(pyclipper.CT_INTERSECTION, pyclipper.PFT_NONZERO, pyclipper.PFT_NONZERO))
+                
+                if not type(ARV_calc[0][0]) == list:
+                    ARV_calc = [ARV_calc]
+            # Shortest way out prio, so use full SSD (ARV_calc = ARV)
+            else:
+                ARV_calc = ARV
+            # Update calculatable ARV for resolutions
+            dbconf.ARV_calc[i] = ARV_calc
         
     # Update inconf if CD is set to SSD
     if dbconf.cd_name == "SSD":
