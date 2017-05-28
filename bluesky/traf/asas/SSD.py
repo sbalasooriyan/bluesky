@@ -68,9 +68,13 @@ def resolve(dbconf, traf):
     new_trk  = np.arctan2(dbconf.asase, dbconf.asasn) * 180 / np.pi
     new_spd  = np.sqrt(dbconf.asase ** 2 + dbconf.asasn ** 2)
     
+    # Sometimes an aircraft is in conflict, but no solutions could be found
+    # In that case it is assigned 0 by ASAS, but needs to handled
+    asas_cmd = np.logical_and(dbconf.inconf, new_spd > 0)
+    
     # Assign new track and speed for those that are in conflict
-    dbconf.trk[dbconf.inconf] = new_trk[dbconf.inconf]
-    dbconf.spd[dbconf.inconf] = new_spd[dbconf.inconf]
+    dbconf.trk[asas_cmd] = new_trk[asas_cmd]
+    dbconf.spd[asas_cmd] = new_spd[asas_cmd]
     # Not sure whether this is needed...
     dbconf.vs   = traf.vs
 
@@ -104,7 +108,7 @@ def area(vset):
 # dbconf is an object of the ASAS class defined in asas.py
 def constructSSD(dbconf, traf, priocode = "FF1"):
     """ Calculates the FRV and ARV of the SSD """
-    output = ''
+    N = 0
     # Parameters
     N_angle = 180                   # [-] Number of points on circle (discretization)
     vmin    = dbconf.vmin           # [m/s] Defined in asas.py (100 kts)
@@ -144,6 +148,7 @@ def constructSSD(dbconf, traf, priocode = "FF1"):
         # Map them into the format ARV wants. Outercircle CCW, innercircle CW
         dbconf.ARV[0] = circle_lst
         dbconf.FRV[0] = []
+        dbconf.ARV_calc[0] = dbconf.ARV[0]
         # Calculate areas and store in dbconf
         dbconf.FRV_area[0] = 0
         dbconf.ARV_area[0] = np.pi * (vmax **2 - vmin ** 2)
@@ -192,6 +197,7 @@ def constructSSD(dbconf, traf, priocode = "FF1"):
     
     # Calculate SSD for every aircraft (See formulas appendix)
     for i in range(ntraf):
+        print i
         # SSD for aircraft i
         # Get indices that belong to aircraft i
         ind = np.where(np.logical_or(ind1 == i,ind2 == i))[0]
@@ -201,6 +207,7 @@ def constructSSD(dbconf, traf, priocode = "FF1"):
             # Map them into the format ARV wants. Outercircle CCW, innercircle CW
             dbconf.ARV[i] = circle_lst
             dbconf.FRV[i] = []
+            dbconf.ARV_calc[i] = dbconf.ARV[i]
             # Calculate areas and store in dbconf
             dbconf.FRV_area[i] = 0
             dbconf.ARV_area[i] = np.pi * (vmax **2 - vmin ** 2)
@@ -238,8 +245,8 @@ def constructSSD(dbconf, traf, priocode = "FF1"):
             # Add each other other aircraft to clipper as clip
             for j in range(np.shape(i_other)[0]):
                 VO = pyclipper.scale_to_clipper(map(tuple,xy[j,:,:]))
-                print "AC0" + str(i) + " - AC0" + str(i_other[j])
-                print dist_pair[j]
+#                print "AC0" + str(i) + " - AC0" + str(i_other[j])
+#                print dist_pair[j]
                 pc.AddPath(VO, pyclipper.PT_CLIP, True)
                 # Detect conflicts, store in confmatrix
                 # Returns 0 if false, -1 if pt is on poly and +1 if pt is in poly.
@@ -250,7 +257,9 @@ def constructSSD(dbconf, traf, priocode = "FF1"):
                 
             # Execute clipper command
             FRV = pyclipper.scale_from_clipper(pc.Execute(pyclipper.CT_INTERSECTION, pyclipper.PFT_NONZERO, pyclipper.PFT_NONZERO))
+            N += 1
             ARV = pc.Execute(pyclipper.CT_DIFFERENCE, pyclipper.PFT_NONZERO, pyclipper.PFT_NONZERO)
+            N += 1
             if not priocode == "FF1":
                 # Make another clipper object for extra intersections
                 pc2 = pyclipper.Pyclipper()
@@ -259,56 +268,73 @@ def constructSSD(dbconf, traf, priocode = "FF1"):
             # Scale back
             ARV = pyclipper.scale_from_clipper(ARV)
             
-            # Check multi exteriors, if this layer is not a list, it means it has no exteriors
-            # In that case, make it a list, such that its format is consistent with further code
-    #        print i
-            if not type(FRV[0][0]) == list:
-                FRV = [FRV]
-            if not type(ARV[0][0]) == list:
-                ARV = [ARV]
-            # Store in dbconf 
-            dbconf.FRV[i] = FRV
-            dbconf.ARV[i] = ARV
-            # Calculate areas and store in dbconf
-            dbconf.FRV_area[i] = area(FRV)
-            dbconf.ARV_area[i] = area(ARV)
-        
-            # For resolution purposes sometimes extra intersections are wanted
-            if priocode == "FF2" or priocode == "FF7":
-                # Make a box that covers right or left of SSD
-                own_hdg = hdg[i] * np.pi / 180
-                # Efficient calculation of box, see notes
-                if priocode == "FF2":
-                    # CW or right-turning
-                    sin_table = np.array([[1,0],[-1,0],[-1,-1],[1,-1]], dtype=np.float64)
-                    cos_table = np.array([[0,1],[0,-1],[1,-1],[1,1]], dtype=np.float64)
-                elif priocode == "FF7":
-                    # CCW or left-turning
-                    sin_table = np.array([[1,0],[1,1],[-1,1],[-1,0]], dtype=np.float64)
-                    cos_table = np.array([[0,1],[-1,1],[-1,-1],[0,-1]], dtype=np.float64)
-                # Normalized coordinates of box
-                xyb = np.sin(own_hdg) * sin_table + np.cos(own_hdg) * cos_table
-                # Scale with vmax (and some factor) and put in tuple
-                box = pyclipper.scale_to_clipper(map(tuple, 1.1 * vmax * xyb))
-                pc2.AddPath(box, pyclipper.PT_SUBJECT, True)
-                # Execute clipper command
-                ARV_calc = pyclipper.scale_from_clipper(pc2.Execute(pyclipper.CT_INTERSECTION, pyclipper.PFT_NONZERO, pyclipper.PFT_NONZERO))
-                
-                if not type(ARV_calc[0][0]) == list:
-                    ARV_calc = [ARV_calc]
-            # Shortest way out prio, so use full SSD (ARV_calc = ARV)
+            # Check if ARV or FRV is empty
+            if len(ARV) == 0:
+                # No aircraft in the vicinity
+                # Map them into the format ARV wants. Outercircle CCW, innercircle CW
+                dbconf.ARV[i] = []
+                dbconf.FRV[i] = circle_lst
+                dbconf.ARV_calc[i] = []
+                # Calculate areas and store in dbconf
+                dbconf.FRV_area[i] = np.pi * (vmax **2 - vmin ** 2)
+                dbconf.ARV_area[i] = 0
+            elif len(FRV) == 0:
+                # Should not happen, only possible when one aircraft, or no other
+                # aircraft in the vicinity. ALready handled earlier.
+                print "FRV empty"
             else:
-                ARV_calc = ARV
-            # Update calculatable ARV for resolutions
-            dbconf.ARV_calc[i] = ARV_calc
+                # Check multi exteriors, if this layer is not a list, it means it has no exteriors
+                # In that case, make it a list, such that its format is consistent with further code
+                if not type(FRV[0][0]) == list:
+                    FRV = [FRV]
+                if not type(ARV[0][0]) == list:
+                    ARV = [ARV]
+                # Store in dbconf 
+                dbconf.FRV[i] = FRV
+                dbconf.ARV[i] = ARV
+                # Calculate areas and store in dbconf
+                dbconf.FRV_area[i] = area(FRV)
+                dbconf.ARV_area[i] = area(ARV)
+            
+                # For resolution purposes sometimes extra intersections are wanted
+                if priocode == "FF2" or priocode == "FF7":
+                    # Make a box that covers right or left of SSD
+                    own_hdg = hdg[i] * np.pi / 180
+                    # Efficient calculation of box, see notes
+                    if priocode == "FF2":
+                        # CW or right-turning
+                        sin_table = np.array([[1,0],[-1,0],[-1,-1],[1,-1]], dtype=np.float64)
+                        cos_table = np.array([[0,1],[0,-1],[1,-1],[1,1]], dtype=np.float64)
+                    elif priocode == "FF7":
+                        # CCW or left-turning
+                        sin_table = np.array([[1,0],[1,1],[-1,1],[-1,0]], dtype=np.float64)
+                        cos_table = np.array([[0,1],[-1,1],[-1,-1],[0,-1]], dtype=np.float64)
+                    # Normalized coordinates of box
+                    xyb = np.sin(own_hdg) * sin_table + np.cos(own_hdg) * cos_table
+                    # Scale with vmax (and some factor) and put in tuple
+                    box = pyclipper.scale_to_clipper(map(tuple, 1.1 * vmax * xyb))
+                    pc2.AddPath(box, pyclipper.PT_SUBJECT, True)
+                    # Execute clipper command
+                    ARV_calc = pyclipper.scale_from_clipper(pc2.Execute(pyclipper.CT_INTERSECTION, pyclipper.PFT_NONZERO, pyclipper.PFT_NONZERO))
+                    N += 1
+                    
+                    if not type(ARV_calc[0][0]) == list:
+                        ARV_calc = [ARV_calc]
+                # Shortest way out prio, so use full SSD (ARV_calc = ARV)
+                else:
+                    ARV_calc = ARV
+                # Update calculatable ARV for resolutions
+                dbconf.ARV_calc[i] = ARV_calc
         
     # Update inconf if CD is set to SSD
     if dbconf.cd_name == "SSD":
         dbconf.inconf = np.sum(dbconf.confmatrix, axis=0) > 0
-        
-#    dump([hsep,vmin,vmax,gsnorth,gseast,lat,lon,ntraf,dbconf.FRV,dbconf.ARV])
-    output += 'hoi'
-    return output
+    print N
+    print N
+    print N
+    print N
+    print N
+    return
         
 
 
@@ -331,7 +357,7 @@ def resolve_closest(dbconf, traf):
     # Loop through SSDs of all aircraft
     for i in range(ntraf):
         # Only those that are in conflict need to resolve
-        if dbconf.inconf[i]:
+        if dbconf.inconf[i] and len(ARV[i]) > 0:
             # Loop through all exteriors and append. Afterwards concatenate
             p = []
             q = []
@@ -384,6 +410,7 @@ def resolve_closest(dbconf, traf):
             if not dbconf.asaseval:
                 dbconf.asaseval = True
         # Those that are not in conflict will be assigned zeros
+        # Or those that have no solutions (full ARV)
         else:
             dbconf.asase[i] = 0.
             dbconf.asasn[i] = 0.
