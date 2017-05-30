@@ -46,16 +46,16 @@ def resolve(dbconf, traf):
     # Initialize SSD variables
     initializeSSD(dbconf, traf)
     
-    # Construct the SSD
-    constructSSD(dbconf, traf, dbconf.priocode)
-    
     # Check what CD-method is used
     if not dbconf.cd_name == "SSD":
         # Use STATEBASED CD then
         dbconf.inconf = np.array([len(ids) > 0 for ids in dbconf.iconf])
     
+    # Construct the SSD
+    constructSSD(dbconf, traf, dbconf.priocode)
+    
     # Get resolved speed-vector
-    if dbconf.priocode == "FF1" or dbconf.priocode == "FF2" or dbconf.priocode == "FF4" or dbconf.priocode == "FF7":
+    if dbconf.priocode == "FF1" or dbconf.priocode == "FF2" or dbconf.priocode == "FF3" or dbconf.priocode == "FF4" or dbconf.priocode == "FF7":
         resolve_closest(dbconf, traf)
             
     
@@ -161,7 +161,8 @@ def constructSSD(dbconf, traf, priocode = "FF1"):
     # This way the qdrdist is only calculated once between every aircraft
     # To get all combinations, use this function to get the indices
     ind1, ind2 = qdrdist_matrix_indices(ntraf)
-    # Get relative bearing [deg] and distance [nm]
+    # Get absolute bearing [deg] and distance [nm]
+    # Not sure abs/rel, but qdr is defined from [-180,180] deg, w.r.t. North
     [qdr, dist] = geo.qdrdist_matrix(lat[ind1], lon[ind1], lat[ind2], lon[ind2])
     # Put result of function from matrix to ndarray
     qdr  = np.reshape(np.array(qdr), np.shape(ind1))
@@ -197,143 +198,189 @@ def constructSSD(dbconf, traf, priocode = "FF1"):
     
     # Calculate SSD for every aircraft (See formulas appendix)
     for i in range(ntraf):
-        print i
-        # SSD for aircraft i
-        # Get indices that belong to aircraft i
-        ind = np.where(np.logical_or(ind1 == i,ind2 == i))[0]
-        # Check whether there are any aircraft in the vicinity
-        if len(ind) == 0:
-            # No aircraft in the vicinity
-            # Map them into the format ARV wants. Outercircle CCW, innercircle CW
-            dbconf.ARV[i] = circle_lst
-            dbconf.FRV[i] = []
-            dbconf.ARV_calc[i] = dbconf.ARV[i]
-            # Calculate areas and store in dbconf
-            dbconf.FRV_area[i] = 0
-            dbconf.ARV_area[i] = np.pi * (vmax **2 - vmin ** 2)
-        else:
-            # The i's of the other aircraft
-            i_other = np.delete(np.arange(0, ntraf), i)
-            # Aircraft that are within ADS-B range
-            ac_adsb = np.where(dist[ind] < adsbmax)[0]
-            # Now account for ADS-B range in indices of other aircraft (i_other)
-            ind = ind[ac_adsb]
-            i_other = i_other[ac_adsb]
-            # Distances between aircraft pairs
-            dist_pair = dist[ind]
-            # VO from 2 to 1 is mirror of 1 to 2. Only 1 to 2 can be constructed in
-            # this manner, so need a correction vector that will mirror the VO
-            fix = np.ones(np.shape(i_other))
-            fix[i_other < i] = -1
-            
-            # Get vertices in an x- and y-array of size (ntraf-1)*3x1
-            x = np.concatenate((gseast[i_other],
-                                x1[ind] * fix + gseast[i_other],
-                                x2[ind] * fix + gseast[i_other]))
-            y = np.concatenate((gsnorth[i_other],
-                                y1[ind] * fix + gsnorth[i_other],
-                                y2[ind] * fix + gsnorth[i_other]))
-            # Reshape [(ntraf-1)x3] and put arrays in one array [(ntraf-1)x3x2]
-            x = np.transpose(x.reshape(3, np.shape(i_other)[0]))
-            y = np.transpose(y.reshape(3, np.shape(i_other)[0])) 
-            xy = np.dstack((x,y))
-            
-            # Make a clipper object
-            pc = pyclipper.Pyclipper()
-            # Add circles (ring-shape) to clipper as subject
-            pc.AddPaths(pyclipper.scale_to_clipper(circle_tup), pyclipper.PT_SUBJECT, True)
-            # Add each other other aircraft to clipper as clip
-            for j in range(np.shape(i_other)[0]):
-                VO = pyclipper.scale_to_clipper(map(tuple,xy[j,:,:]))
-#                print "AC0" + str(i) + " - AC0" + str(i_other[j])
-#                print dist_pair[j]
-                pc.AddPath(VO, pyclipper.PT_CLIP, True)
-                # Detect conflicts, store in confmatrix
-                # Returns 0 if false, -1 if pt is on poly and +1 if pt is in poly.
-                if pyclipper.PointInPolygon(pyclipper.scale_to_clipper((gseast[i],gsnorth[i])),VO):
-                    dbconf.confmatrix[i,i_other[j]] = True
-                    
-            
-                
-            # Execute clipper command
-            FRV = pyclipper.scale_from_clipper(pc.Execute(pyclipper.CT_INTERSECTION, pyclipper.PFT_NONZERO, pyclipper.PFT_NONZERO))
-            N += 1
-            ARV = pc.Execute(pyclipper.CT_DIFFERENCE, pyclipper.PFT_NONZERO, pyclipper.PFT_NONZERO)
-            N += 1
-            if not priocode == "FF1":
-                # Make another clipper object for extra intersections
-                pc2 = pyclipper.Pyclipper()
-                # Put the ARV in there
-                pc2.AddPaths(ARV, pyclipper.PT_CLIP, True)
-            # Scale back
-            ARV = pyclipper.scale_from_clipper(ARV)
-            
-            # Check if ARV or FRV is empty
-            if len(ARV) == 0:
+        # When using statebased-CD, the SSD won't be calculated for aircraft that are not in conflict
+        # This is MUCH faster for large-scale simulations
+#        print i
+#        print dbconf.cd_name
+#        print dbconf.inconf[i]
+        if not dbconf.cd_name == "SSD" and dbconf.inconf[i]:
+#            print i
+            # SSD for aircraft i
+            # Get indices that belong to aircraft i
+            ind = np.where(np.logical_or(ind1 == i,ind2 == i))[0]
+            # Check whether there are any aircraft in the vicinity
+            if len(ind) == 0:
                 # No aircraft in the vicinity
                 # Map them into the format ARV wants. Outercircle CCW, innercircle CW
-                dbconf.ARV[i] = []
-                dbconf.FRV[i] = circle_lst
-                dbconf.ARV_calc[i] = []
+                dbconf.ARV[i] = circle_lst
+                dbconf.FRV[i] = []
+                dbconf.ARV_calc[i] = dbconf.ARV[i]
                 # Calculate areas and store in dbconf
-                dbconf.FRV_area[i] = np.pi * (vmax **2 - vmin ** 2)
-                dbconf.ARV_area[i] = 0
-            elif len(FRV) == 0:
-                # Should not happen, only possible when one aircraft, or no other
-                # aircraft in the vicinity. ALready handled earlier.
-                print "FRV empty"
+                dbconf.FRV_area[i] = 0
+                dbconf.ARV_area[i] = np.pi * (vmax **2 - vmin ** 2)
             else:
-                # Check multi exteriors, if this layer is not a list, it means it has no exteriors
-                # In that case, make it a list, such that its format is consistent with further code
-                if not type(FRV[0][0]) == list:
-                    FRV = [FRV]
-                if not type(ARV[0][0]) == list:
-                    ARV = [ARV]
-                # Store in dbconf 
-                dbconf.FRV[i] = FRV
-                dbconf.ARV[i] = ARV
-                # Calculate areas and store in dbconf
-                dbconf.FRV_area[i] = area(FRV)
-                dbconf.ARV_area[i] = area(ARV)
-            
-                # For resolution purposes sometimes extra intersections are wanted
-                if priocode == "FF2" or priocode == "FF7":
-                    # Make a box that covers right or left of SSD
-                    own_hdg = hdg[i] * np.pi / 180
-                    # Efficient calculation of box, see notes
-                    if priocode == "FF2":
-                        # CW or right-turning
-                        sin_table = np.array([[1,0],[-1,0],[-1,-1],[1,-1]], dtype=np.float64)
-                        cos_table = np.array([[0,1],[0,-1],[1,-1],[1,1]], dtype=np.float64)
-                    elif priocode == "FF7":
-                        # CCW or left-turning
-                        sin_table = np.array([[1,0],[1,1],[-1,1],[-1,0]], dtype=np.float64)
-                        cos_table = np.array([[0,1],[-1,1],[-1,-1],[0,-1]], dtype=np.float64)
-                    # Normalized coordinates of box
-                    xyb = np.sin(own_hdg) * sin_table + np.cos(own_hdg) * cos_table
-                    # Scale with vmax (and some factor) and put in tuple
-                    box = pyclipper.scale_to_clipper(map(tuple, 1.1 * vmax * xyb))
-                    pc2.AddPath(box, pyclipper.PT_SUBJECT, True)
-                    # Execute clipper command
-                    ARV_calc = pyclipper.scale_from_clipper(pc2.Execute(pyclipper.CT_INTERSECTION, pyclipper.PFT_NONZERO, pyclipper.PFT_NONZERO))
-                    N += 1
+                # The i's of the other aircraft
+                i_other = np.delete(np.arange(0, ntraf), i)
+                # Aircraft that are within ADS-B range
+                ac_adsb = np.where(dist[ind] < adsbmax)[0]
+                # Now account for ADS-B range in indices of other aircraft (i_other)
+                ind = ind[ac_adsb]
+                i_other = i_other[ac_adsb]
+#                # Distances between aircraft pairs
+#                dist_pair = dist[ind]
+                # VO from 2 to 1 is mirror of 1 to 2. Only 1 to 2 can be constructed in
+                # this manner, so need a correction vector that will mirror the VO
+                fix = np.ones(np.shape(i_other))
+                fix[i_other < i] = -1
+                # Relative bearing [deg] from [-180,180] 
+                # (less required conversions than rad in RotA)
+                fix_ang = np.zeros(np.shape(i_other))
+                fix_ang[i_other < i] = 180.
+                
+                
+                # Get vertices in an x- and y-array of size (ntraf-1)*3x1
+                x = np.concatenate((gseast[i_other],
+                                    x1[ind] * fix + gseast[i_other],
+                                    x2[ind] * fix + gseast[i_other]))
+                y = np.concatenate((gsnorth[i_other],
+                                    y1[ind] * fix + gsnorth[i_other],
+                                    y2[ind] * fix + gsnorth[i_other]))
+                # Reshape [(ntraf-1)x3] and put arrays in one array [(ntraf-1)x3x2]
+                x = np.transpose(x.reshape(3, np.shape(i_other)[0]))
+                y = np.transpose(y.reshape(3, np.shape(i_other)[0])) 
+                xy = np.dstack((x,y))
+                
+                # Make a clipper object
+                pc = pyclipper.Pyclipper()
+                # Add circles (ring-shape) to clipper as subject
+                pc.AddPaths(pyclipper.scale_to_clipper(circle_tup), pyclipper.PT_SUBJECT, True)
+                
+                # Extra stuff needed for RotA
+                if priocode == "FF3":
+                    # Make another clipper object for RotA
+                    pc_rota = pyclipper.Pyclipper()
+                    pc_rota.AddPaths(pyclipper.scale_to_clipper(circle_tup), pyclipper.PT_SUBJECT, True)
+                    # Bearing calculations from own view and other view
+                    brg_own = np.mod((np.rad2deg(qdr[ind]) + fix_ang - hdg[i]) + 540., 360.) - 180.
+                    brg_other = np.mod((np.rad2deg(qdr[ind]) + 180. - fix_ang - hdg[i_other]) + 540., 360.) - 180.
                     
-                    if not type(ARV_calc[0][0]) == list:
-                        ARV_calc = [ARV_calc]
-                # Shortest way out prio, so use full SSD (ARV_calc = ARV)
+                # Add each other other aircraft to clipper as clip
+                for j in range(np.shape(i_other)[0]):
+#                    print "AC0" + str(i) + " - AC0" + str(i_other[j])
+#                    print dist_pair[j]
+#                    print brg_own[j]
+#                    print brg_other[j]
+                    # Normally VO shall be added of this other a/c
+                    VO = pyclipper.scale_to_clipper(map(tuple,xy[j,:,:]))
+                    pc.AddPath(VO, pyclipper.PT_CLIP, True)
+                    # For RotA it is possible to ignore
+                    if priocode == "FF3":
+                        if brg_own[j] >= -20. and brg_own[j] <= 110.:
+                            # Head-on or converging from right
+                            pc_rota.AddPath(VO, pyclipper.PT_CLIP, True)
+                        elif brg_other[j] <= -110. or brg_other[j] >= 110.:
+                            # In overtaking position
+                            pc_rota.AddPath(VO, pyclipper.PT_CLIP, True)
+                    # Detect conflicts, store in confmatrix
+                    # Returns 0 if false, -1 if pt is on poly and +1 if pt is in poly.
+                    if pyclipper.PointInPolygon(pyclipper.scale_to_clipper((gseast[i],gsnorth[i])),VO):
+                        dbconf.confmatrix[i,i_other[j]] = True
+                        
+                
+                    
+                # Execute clipper command
+                FRV = pyclipper.scale_from_clipper(pc.Execute(pyclipper.CT_INTERSECTION, pyclipper.PFT_NONZERO, pyclipper.PFT_NONZERO))
+#                N += 1
+                ARV = pc.Execute(pyclipper.CT_DIFFERENCE, pyclipper.PFT_NONZERO, pyclipper.PFT_NONZERO)
+#                N += 1
+                    
+                
+                if not priocode == "FF1":
+                    # Make another clipper object for extra intersections
+                    pc2 = pyclipper.Pyclipper()
+                    # When using RotA clip with pc_rota
+                    if priocode == "FF3":
+                        # Calculate ARV for RotA
+                        ARV_rota = pc_rota.Execute(pyclipper.CT_DIFFERENCE, pyclipper.PFT_NONZERO, pyclipper.PFT_NONZERO)
+                        pc2.AddPaths(ARV_rota, pyclipper.PT_CLIP, True)
+                    else:
+                        # Put the ARV in there
+                        pc2.AddPaths(ARV, pyclipper.PT_CLIP, True)
+                # Scale back
+                ARV = pyclipper.scale_from_clipper(ARV)
+                
+                # Check if ARV or FRV is empty
+                if len(ARV) == 0:
+                    # No aircraft in the vicinity
+                    # Map them into the format ARV wants. Outercircle CCW, innercircle CW
+                    dbconf.ARV[i] = []
+                    dbconf.FRV[i] = circle_lst
+                    dbconf.ARV_calc[i] = []
+                    # Calculate areas and store in dbconf
+                    dbconf.FRV_area[i] = np.pi * (vmax **2 - vmin ** 2)
+                    dbconf.ARV_area[i] = 0
+                elif len(FRV) == 0:
+                    # Should not happen with one a/c or no other a/c in the vicinity.
+                    # These are handled earlier. Happens when RotA has removed all
+                    # Map them into the format ARV wants. Outercircle CCW, innercircle CW
+                    dbconf.ARV[i] = circle_lst
+                    dbconf.FRV[i] = []
+                    dbconf.ARV_calc[i] = circle_lst
+                    # Calculate areas and store in dbconf
+                    dbconf.FRV_area[i] = 0
+                    dbconf.ARV_area[i] = np.pi * (vmax **2 - vmin ** 2)
                 else:
-                    ARV_calc = ARV
-                # Update calculatable ARV for resolutions
-                dbconf.ARV_calc[i] = ARV_calc
-        
+                    # Check multi exteriors, if this layer is not a list, it means it has no exteriors
+                    # In that case, make it a list, such that its format is consistent with further code
+                    if not type(FRV[0][0]) == list:
+                        FRV = [FRV]
+                    if not type(ARV[0][0]) == list:
+                        ARV = [ARV]
+                    # Store in dbconf 
+                    dbconf.FRV[i] = FRV
+                    dbconf.ARV[i] = ARV
+                    # Calculate areas and store in dbconf
+                    dbconf.FRV_area[i] = area(FRV)
+                    dbconf.ARV_area[i] = area(ARV)
+                
+                    # For resolution purposes sometimes extra intersections are wanted
+                    if priocode == "FF2" or priocode == "FF7" or priocode == "FF3":
+                        # Make a box that covers right or left of SSD
+                        own_hdg = hdg[i] * np.pi / 180
+                        # Efficient calculation of box, see notes
+                        if priocode == "FF2" or priocode == "FF3":
+                            # CW or right-turning
+                            sin_table = np.array([[1,0],[-1,0],[-1,-1],[1,-1]], dtype=np.float64)
+                            cos_table = np.array([[0,1],[0,-1],[1,-1],[1,1]], dtype=np.float64)
+                        elif priocode == "FF7":
+                            # CCW or left-turning
+                            sin_table = np.array([[1,0],[1,1],[-1,1],[-1,0]], dtype=np.float64)
+                            cos_table = np.array([[0,1],[-1,1],[-1,-1],[0,-1]], dtype=np.float64)
+                        # Normalized coordinates of box
+                        xyb = np.sin(own_hdg) * sin_table + np.cos(own_hdg) * cos_table
+                        # Scale with vmax (and some factor) and put in tuple
+                        box = pyclipper.scale_to_clipper(map(tuple, 1.1 * vmax * xyb))
+                        pc2.AddPath(box, pyclipper.PT_SUBJECT, True)
+                        # Execute clipper command
+                        ARV_calc = pyclipper.scale_from_clipper(pc2.Execute(pyclipper.CT_INTERSECTION, pyclipper.PFT_NONZERO, pyclipper.PFT_NONZERO))
+                        N += 1
+                        
+                        if not type(ARV_calc[0][0]) == list:
+                            ARV_calc = [ARV_calc]
+                    # Shortest way out prio, so use full SSD (ARV_calc = ARV)
+                    else:
+                        ARV_calc = ARV
+                    # Update calculatable ARV for resolutions
+#                    print ARV_calc
+                    dbconf.ARV_calc[i] = ARV_calc
+#            print N
+#            print N
+#            print N
+#            print N
+#            print N
     # Update inconf if CD is set to SSD
     if dbconf.cd_name == "SSD":
         dbconf.inconf = np.sum(dbconf.confmatrix, axis=0) > 0
-    print N
-    print N
-    print N
-    print N
-    print N
     return
         
 
@@ -344,7 +391,7 @@ def resolve_closest(dbconf, traf):
     "Calculates closest conflict-free point"
     # It's just linalg, however credits to: http://stackoverflow.com/a/1501725
     # Variables
-    ARV     = dbconf.ARV_calc
+    ARV = dbconf.ARV_calc
     # Select AP-setting as point
     if dbconf.priocode == "FF4":
         gsnorth = np.cos(traf.ap.trk / 180 * np.pi) * traf.ap.tas
