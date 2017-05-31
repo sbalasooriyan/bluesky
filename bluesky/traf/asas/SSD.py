@@ -55,7 +55,7 @@ def resolve(dbconf, traf):
     constructSSD(dbconf, traf, dbconf.priocode)
     
     # Get resolved speed-vector
-    if dbconf.priocode == "FF1" or dbconf.priocode == "FF2" or dbconf.priocode == "FF3" or dbconf.priocode == "FF4" or dbconf.priocode == "FF5" or dbconf.priocode == "FF7":
+    if dbconf.priocode == "FF1" or dbconf.priocode == "FF2" or dbconf.priocode == "FF3" or dbconf.priocode == "FF4" or dbconf.priocode == "FF5" or dbconf.priocode == "FF6" or dbconf.priocode == "FF7":
         resolve_closest(dbconf, traf)
             
     
@@ -129,9 +129,7 @@ def constructSSD(dbconf, traf, priocode = "FF1"):
     ntraf   = traf.ntraf
     hdg     = traf.hdg
     gs_ap   = traf.ap.tas
-    
-    print np.round(gs_ap,2)
-    print np.round(traf.gs,2)
+    hdg_ap  = traf.ap.trk
     
         
     # # Use velocity limits for the ring-shaped part of the SSD
@@ -348,7 +346,7 @@ def constructSSD(dbconf, traf, priocode = "FF1"):
                     dbconf.ARV_area[i] = area(ARV)
                 
                     # For resolution purposes sometimes extra intersections are wanted
-                    if priocode == "FF2" or priocode == "FF7" or priocode == "FF3" or priocode == "FF5":
+                    if priocode == "FF2" or priocode == "FF7" or priocode == "FF3" or priocode == "FF5" or priocode == "FF6":
                         # Make a box that covers right or left of SSD
                         own_hdg = hdg[i] * np.pi / 180
                         # Efficient calculation of box, see notes
@@ -372,25 +370,29 @@ def constructSSD(dbconf, traf, priocode = "FF1"):
                             xyp = (tuple(map(tuple, np.flipud(xyc * min(vmax,gs_ap[i] + 0.1)))), tuple(map(tuple , xyc * max(vmin,gs_ap[i] - 0.1))))
                             part = pyclipper.scale_to_clipper(xyp)
                             pc2.AddPaths(part, pyclipper.PT_SUBJECT, True)
+                        elif priocode == "FF6":
+                            hdg_sel = hdg_ap[i] * np.pi / 180
+                            xyp = np.array([[np.sin(hdg_sel-0.0087),np.cos(hdg_sel-0.0087)],
+                                            [0,0],
+                                            [np.sin(hdg_sel+0.0087),np.cos(hdg_sel+0.0087)]],
+                                            dtype=np.float64)                            
+                            part = pyclipper.scale_to_clipper(map(tuple, 1.1 * vmax * xyp))
+                            pc2.AddPath(part, pyclipper.PT_SUBJECT, True)
                         # Execute clipper command
                         ARV_calc = pyclipper.scale_from_clipper(pc2.Execute(pyclipper.CT_INTERSECTION, pyclipper.PFT_NONZERO, pyclipper.PFT_NONZERO))
                         N += 1
-                        
+                        # If no smaller ARV is found, take the full ARV
                         if len(ARV_calc) == 0:
                             ARV_calc = ARV
-                        
+                        # Check multi exteriors, if this layer is not a list, it means it has no exteriors
+                        # In that case, make it a list, such that its format is consistent with further code
                         if not type(ARV_calc[0][0]) == list:
                             ARV_calc = [ARV_calc]
                     # Shortest way out prio, so use full SSD (ARV_calc = ARV)
                     else:
                         ARV_calc = ARV
-                    # Update calculatable ARV for resolutions
-#                    print ARV_calc
+                    # Update calculatable ARV for resolutions                    
                     dbconf.ARV_calc[i] = ARV_calc
-#            print N
-#            print N
-#            print N
-#            print N
 #            print N
     # Update inconf if CD is set to SSD
     if dbconf.cd_name == "SSD":
