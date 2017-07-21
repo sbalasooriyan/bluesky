@@ -1,7 +1,7 @@
 import numpy as np
 from math import *
 from random import random, randint
-from ..tools import datalog, geo
+from ..tools import datalog, geo, logHeader
 from ..tools.misc import latlon2txt
 from ..tools.aero import fpm, kts, ft, g0, Rearth, nm, \
                          vatmos,  vtas2cas, vtas2mach, casormach, vcasormach
@@ -56,10 +56,11 @@ class Traffic(DynamicArrays):
         self.wind = WindSim()
 
         # Define the periodic loggers
-        # ToDo: explain what these line sdo in comments (type of logs?)
-        datalog.definePeriodicLogger('SNAPLOG', 'SNAPLOG logfile.', settings.snapdt)
-        datalog.definePeriodicLogger('INSTLOG', 'INSTLOG logfile.', settings.instdt)
-        datalog.definePeriodicLogger('SKYLOG', 'SKYLOG logfile.', settings.skydt)
+        datalog.definePeriodicLogger('SNAPLOG', logHeader.snapHeader(), 10.0)
+        datalog.definePeriodicLogger('CFLLOG' , logHeader.cflHeader() ,  1.0)
+        # Define event-based loggers
+        self.skylog = datalog.defineLogger('SKYLOG', logHeader.skyHeader())
+        self.evtlog = datalog.defineLogger('EVTLOG', logHeader.evtHeader())
 
         with RegisterElementParameters(self):
 
@@ -67,36 +68,45 @@ class Traffic(DynamicArrays):
             with datalog.registerLogParameters('SNAPLOG', self):
                 # Aircraft Info
                 self.id      = []  # identifier (string)
-                self.type    = []  # aircaft type (string)
 
                 # Positions
-                self.lat     = np.array([])  # latitude [deg]
-                self.lon     = np.array([])  # longitude [deg]
-                self.alt     = np.array([])  # altitude [m]
-                self.hdg     = np.array([])  # traffic heading [deg]
-                self.trk     = np.array([])  # track angle [deg]
+                self.lat        = np.array([])  # latitude [deg]
+                self.lon        = np.array([])  # longitude [deg]
+                self.alt        = np.array([])  # altitude [m]
+                self.hdg        = np.array([])  # traffic heading [deg]
 
                 # Velocities
-                self.tas     = np.array([])  # true airspeed [m/s]
-                self.gs      = np.array([])  # ground speed [m/s]
-                self.gsnorth = np.array([])  # ground speed [m/s]
-                self.gseast  = np.array([])  # ground speed [m/s]
-                self.cas     = np.array([])  # calibrated airspeed [m/s]
-                self.M       = np.array([])  # mach number
-                self.vs      = np.array([])  # vertical speed [m/s]
-
-                # Atmosphere
-                self.p       = np.array([])  # air pressure [N/m2]
-                self.rho     = np.array([])  # air density [kg/m3]
-                self.Temp    = np.array([])  # air temperature [K]
-                self.dtemp   = np.array([])  # delta t for non-ISA conditions
+                self.tas        = np.array([])  # true airspeed [m/s]
+                self.gs         = np.array([])  # ground speed [m/s]
+                self.cas        = np.array([])  # calibrated airspeed [m/s]
+                self.M          = np.array([])  # mach number
 
                 # Traffic autopilot settings
-                self.aspd   = np.array([])  # selected spd(CAS) [m/s]
-                self.aptas  = np.array([])  # just for initializing
-                self.ama    = np.array([])  # selected spd above crossover altitude (Mach) [-]
-                self.apalt  = np.array([])  # selected alt[m]
-                self.avs    = np.array([])  # selected vertical speed [m/s]
+                self.apalt      = np.array([])  # selected alt[m]
+                self.aspd       = np.array([])  # selected spd(CAS) [m/s]
+                self.aptas      = np.array([])  # just for initializing
+                self.aphdg      = np.array([])  # selected heading [deg]
+
+                # Efficiency related variables
+                self.dist       = np.array([])   # Horizontal flight distance [m]
+                self.work       = np.array([])   # Work Done [J]
+                
+
+                
+            
+
+            # Originally in snaplog
+            self.type    = []  # aircaft type (string)
+            self.trk     = np.array([])  # track angle [deg]
+            self.gsnorth = np.array([])  # ground speed [m/s]
+            self.gseast  = np.array([])  # ground speed [m/s]
+            self.vs      = np.array([])  # vertical speed [m/s]
+            self.p       = np.array([])  # air pressure [N/m2]
+            self.rho     = np.array([])  # air density [kg/m3]
+            self.Temp    = np.array([])  # air temperature [K]
+            self.dtemp   = np.array([])  # delta t for non-ISA conditions
+            self.ama    = np.array([])  # selected spd above crossover altitude (Mach) [-]
+            self.avs    = np.array([])  # selected vertical speed [m/s]
 
             # Whether to perform LNAV and VNAV
             self.swlnav   = np.array([], dtype=np.bool)
@@ -135,9 +145,81 @@ class Traffic(DynamicArrays):
             self.coslat = np.array([])  # Cosine of latitude for computations
             self.eps    = np.array([])  # Small nonzero numbers
 
+        
+        with datalog.registerLogParameters('CFLLOG', self):
+            # Aircraft Info
+            self.cflid      = []  # identifier (string)
+
+            # Positions
+            self.cfllat     = np.array([])  # latitude [deg]
+            self.cfllon     = np.array([])  # longitude [deg]
+            self.cflalt     = np.array([])  # altitude [m]
+            self.cflhdg     = np.array([])  # traffic heading [deg]
+
+            # Velocities
+            self.cfltas     = np.array([])  # true airspeed [m/s]
+            self.cflgs      = np.array([])  # ground speed [m/s]
+            self.cflcas     = np.array([])  # calibrated airspeed [m/s]
+            self.cflM       = np.array([])  # mach number
+
+            # Traffic autopilot settings
+            self.cflapalt   = np.array([])  # selected alt[m]
+            self.cflaspd    = np.array([])  # selected spd(CAS) [m/s]
+            self.cflaptas   = np.array([])  # just for initializing
+            self.cflaphdg   = np.array([])  # selected heading [deg]
+            
+            # Traffic ASAS settings
+            self.cflasasspd = np.array([])  # resolution speed [m/s]
+            self.cflasashdg = np.array([])  # resolution heading [deg]
+
+            # Efficiency related variables
+            self.cfldist    = np.array([])   # Horizontal flight distance [m]
+            self.cflwork    = np.array([])   # Work Done [J]
+            
+        with datalog.registerLogParameters('SKYLOG', self):
+            # Aircraft Info
+            self.skyid      = []  # identifier (string)
+            # Event Info
+            self.skyevt     = []  # short description (string)
+
+            # Positions
+            self.skylat     = np.array([])  # latitude [deg]
+            self.skylon     = np.array([])  # longitude [deg]
+            self.skyalt     = np.array([])  # altitude [m]
+            self.skyhdg     = np.array([])  # traffic heading [deg]
+
+            # Velocities
+            self.skytas     = np.array([])  # true airspeed [m/s]
+            self.skygs      = np.array([])  # ground speed [m/s]
+            self.skycas     = np.array([])  # calibrated airspeed [m/s]
+            self.skyM       = np.array([])  # mach number
+
+            # Traffic autopilot settings
+            self.skyapalt   = np.array([])  # selected alt[m]
+            self.skyaspd    = np.array([])  # selected spd(CAS) [m/s]
+            self.skyaptas   = np.array([])  # just for initializing
+            self.skyaphdg   = np.array([])  # selected heading [deg]
+            
+            # Traffic ASAS settings
+            self.skyasasspd = np.array([])  # resolution speed [m/s]
+            self.skyasashdg = np.array([])  # resolution heading [deg]
+
+            # Efficiency related variables
+            self.skydist    = np.array([])   # Horizontal flight distance [m]
+            self.skywork    = np.array([])   # Work Done [J]
+            
+        with datalog.registerLogParameters('EVTLOG', self):
+            # Event Info
+            self.evtstr      = []  # Description of event
+        
+        
+        
         # Default bank angles per flight phase
         self.bphase = np.deg2rad(np.array([15, 35, 35, 35, 15, 45]))
-
+        # Logger vars
+        self.evtcfl = []
+        self.evtlos = []
+        
         self.reset(navdb)
 
     def reset(self, navdb):
@@ -235,6 +317,7 @@ class Traffic(DynamicArrays):
         # Traffic autopilot settings
         self.aspd[-n:]  = self.cas[-n:]
         self.aptas[-n:] = self.tas[-n:]
+        self.aphdg[-n:] = self.hdg[-n:]
         self.apalt[-n:] = self.alt[-n:]
 
         # Display information on label
@@ -243,6 +326,11 @@ class Traffic(DynamicArrays):
         # Miscallaneous
         self.coslat[-n:] = np.cos(np.radians(aclats))  # Cosine of latitude for flat-earth aproximations
         self.eps[-n:] = 0.01
+        
+        # Efficiency related variables
+        # not necessary to overwrite 0 to 0, but leave for clarity
+        self.dist[-n:] = 0.0   # Horizontal flight distance [m]
+        self.work[-n:] = 0.0   # Work Done [J]
 
         # ----- Submodules of Traffic -----
         self.ap.create(n)
@@ -325,10 +413,15 @@ class Traffic(DynamicArrays):
         # Traffic autopilot settings
         self.aspd[-1]  = self.cas[-1]
         self.aptas[-1] = self.tas[-1]
+        self.aphdg[-1] = self.hdg[-1]
         self.apalt[-1] = self.alt[-1]
 
         # Display information on label
         self.label[-1] = ['', '', '', 0]
+        
+        # Efficiency related variables
+        self.dist[-1] = 0.0   # Horizontal flight distance [m]
+        self.work[-1] = 0.0   # Work Done [J]
 
         # Miscallaneous
         self.coslat[-1] = cos(radians(aclat))  # Cosine of latitude for flat-earth aproximations
@@ -343,6 +436,9 @@ class Traffic(DynamicArrays):
         self.asas.create()
         self.perf.create()
         self.trails.create()
+        
+        # Logger
+        self.UpdateEvtLog('cre', -1)
 
         return True
 
@@ -407,6 +503,9 @@ class Traffic(DynamicArrays):
             return False
         # Decrease number of aircraft
         self.ntraf = self.ntraf - 1
+        
+        # Logger (call it before actually deleting!!)
+        self.UpdateEvtLog('del', idx)
 
         # Delete all aircraft parameters
         super(Traffic, self).delete(idx)
@@ -449,6 +548,14 @@ class Traffic(DynamicArrays):
         #---------- Aftermath ---------------------------------
         self.trails.update(simt)
         self.area.check(simt)
+        
+        #---------- Flight Efficiency Update ------------------
+        self.UpdateEfficiency(simdt)
+        
+        #---------- Loggers -----------------------------------
+        self.UpdateTrafCflLog()
+        self.UpdateEvtLog('updateconf')
+        
         return
 
     def UpdateAirSpeed(self, simdt, simt):
@@ -745,3 +852,161 @@ class Traffic(DynamicArrays):
                 scr.echo(lines[:-1])  # exclude final newline
             else:
                 return False,"No airway legs found for ",key
+
+    
+    def UpdateEfficiency(self, simdt):
+        # Update flight efficiency metrics
+        ds = simdt * self.gs
+        
+        # Horizontal distance [m]
+        self.dist = self.dist + ds
+        
+        # Work Done [J] = Force * distance; distance = spd*time
+        self.work = self.work + (self.perf.Thr * ds)
+
+           
+    def UpdateTrafCflLog(self):
+        # Bool-array with aircraft in conflict
+        inconf = np.array([len(ids) > 0 for ids in self.asas.iconf])
+        
+        # Aircraft Info
+        self.cflid      = [i for (i, v) in zip(self.id, inconf) if v]
+        
+        # Positions
+        self.cfllat     = self.lat[inconf]
+        self.cfllon     = self.lon[inconf]
+        self.cflalt     = self.alt[inconf]
+        self.cflhdg     = self.hdg[inconf]
+
+        # Velocities
+        self.cfltas     = self.tas[inconf]
+        self.cflgs      = self.gs[inconf]
+        self.cflcas     = self.cas[inconf]
+        self.cflM       = self.M[inconf]
+
+        # Traffic autopilot settings
+        self.cflapalt   = self.apalt[inconf]
+        self.cflaspd    = self.aspd[inconf]
+        self.cflaptas   = self.aptas[inconf]
+        self.cflaphdg   = self.aphdg[inconf]
+        
+        # Traffic ASAS settings
+        self.cflasasspd = self.asas.spd[inconf]
+        self.cflasashdg = self.asas.trk[inconf]
+
+        # Efficiency related variables
+        self.cfldist    = self.dist[inconf]
+        self.cflwork    = self.work[inconf]
+        
+    def UpdateEvtLog(self, evt='', idx=None):
+        # Because of RegisterLogParameters evtstr is set to ['']
+        if self.evtstr == ['']:
+            self.evtstr = []
+        # Set call_log to False
+        call_log = False
+
+        if evt == 'cre':
+            # Event description
+            self.evtstr.append('Created ' + self.id[idx])
+            self.UpdateSkyLog('CRE AC', idx)
+            # Logger must be called
+            call_log = True
+
+        elif evt == 'del':
+            # Event description
+            self.evtstr.append('Deleted ' + self.id[idx])
+            self.UpdateSkyLog('DEL AC', idx)
+            # Logger must be called
+            call_log = True
+
+        elif evt == 'updateconf':
+            # Get created and removed conflicts
+            cre_cfl = [x for x in self.asas.conflist_now if x not in self.evtcfl]
+            del_cfl = [x for x in self.evtcfl if x not in self.asas.conflist_now]
+            # Get created and removed LoS
+            cre_los = [x for x in self.asas.LOSlist_now if x not in self.evtlos]
+            del_los = [x for x in self.evtlos if x not in self.asas.LOSlist_now]
+            # Store conflict list
+            self.evtcfl = self.asas.conflist_now
+            # Store LoS list
+            self.evtlos = self.asas.LOSlist_now
+            # Check if created or removed
+            if len(cre_cfl) > 0:
+                for i in range(len(cre_cfl)):
+                    ac1, ac2 = cre_cfl[i].split(' ')
+                    self.evtstr.append('Conflict started between ' + ac1 + ' and ' + ac2)
+                    self.UpdateSkyLog('CFL START ' + ac2, self.id2idx(ac1))
+                    self.UpdateSkyLog('CFL START ' + ac1, self.id2idx(ac2))
+                    # Logger must be called
+                    call_log = True
+            if len(cre_los) > 0:
+                for i in range(len(cre_los)):
+                    ac1, ac2 = cre_los[i].split(' ')
+                    self.evtstr.append('LoS started between ' + ac1 + ' and ' + ac2)
+                    self.UpdateSkyLog('LOS START ' + ac2, self.id2idx(ac1))
+                    self.UpdateSkyLog('LOS START ' + ac1, self.id2idx(ac2))
+                    # Logger must be called
+                    call_log = True
+            if len(del_cfl) > 0:
+                for i in range(len(del_cfl)):
+                    ac1, ac2 = del_cfl[i].split(' ')
+                    self.evtstr.append('Conflict ended between ' + ac1 + ' and ' + ac2)
+                    self.UpdateSkyLog('CFL END ' + ac2, self.id2idx(ac1))
+                    self.UpdateSkyLog('CFL END ' + ac1, self.id2idx(ac2))
+                    # Logger must be called
+                    call_log = True
+            if len(del_los) > 0:
+                for i in range(len(del_los)):
+                    ac1, ac2 = del_los[i].split(' ')
+                    self.evtstr.append('LoS ended between ' + ac1 + ' and ' + ac2)
+                    self.UpdateSkyLog('LOS END ' + ac2, self.id2idx(ac1))
+                    self.UpdateSkyLog('LOS END ' + ac1, self.id2idx(ac2))
+                    # Logger must be called
+                    call_log = True
+
+        
+        if call_log:
+            # Call the logger
+            self.evtlog.log()
+            # Reset output string
+            self.evtstr = []
+        
+    def UpdateSkyLog(self, evt, idx):
+        
+        # Aircraft Info
+        self.skyid      = [self.id[idx]]
+        # Event Info
+        self.skyevt     = [evt]
+        
+        # Positions
+        self.skylat     = self.lat[[idx]]
+        self.skylon     = self.lon[[idx]]
+        self.skyalt     = self.alt[[idx]]
+        self.skyhdg     = self.hdg[[idx]]
+
+        # Velocities
+        self.skytas     = self.tas[[idx]]
+        self.skygs      = self.gs[[idx]]
+        self.skycas     = self.cas[[idx]]
+        self.skyM       = self.M[[idx]]
+
+        # Traffic autopilot settings
+        self.skyapalt   = self.apalt[[idx]]
+        self.skyaspd    = self.aspd[[idx]]
+        self.skyaptas   = self.aptas[[idx]]
+        self.skyaphdg   = self.aphdg[[idx]]
+        
+        # Traffic ASAS settings
+        self.skyasasspd = self.asas.spd[[idx]]
+        self.skyasashdg = self.asas.trk[[idx]]
+
+        # Efficiency related variables
+        self.skydist    = self.dist[[idx]]
+        self.skywork    = self.work[[idx]]
+        
+        # Call the logger
+        self.skylog.log()
+        
+            
+        
+            

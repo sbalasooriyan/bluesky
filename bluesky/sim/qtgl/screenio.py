@@ -9,8 +9,6 @@ import numpy as np
 import time
 
 # Test imports (SUBA)
-from ...traf.asas import SSD_dump
-from ...traf.asas import SSD
 import suba_fun
 
 # Local imports
@@ -87,8 +85,8 @@ class ScreenIO(QObject):
         if self.manager.isActive():
             # Check whether first four letters are "exec"
             if cmd_text[:4] == 'EXEC':
-                # Execute custom things
-                output = SSD_dump.test_fun(self.sim.traf)
+                # Execute custom things (discontinued)
+                output = 1;
                 if not type(output) == 'str':
                     output = str(output)
             else:
@@ -106,6 +104,9 @@ class ScreenIO(QObject):
                 # Update output with result of command
                 if cmd_res != 'None':
                     output += '\n' + cmd_res
+                    
+                ##
+                output = output.replace(", '",",\n'")
             # Display
             self.manager.sendEvent(StackTextEvent(disptext=output))
 
