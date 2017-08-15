@@ -128,6 +128,14 @@ class ASAS(DynamicArrays):
             return True, "ASAS is currently " + ("ON" if self.swasas else "OFF")
         self.swasas = flag
         return True
+        
+    def limits(self, flag=None, spd=None):
+        if flag is None:
+            return True, "ASAS limits are currently [" + str(self.vmin) + ";" + str(self.vmax) + "]"
+        if flag == "MAX":
+            self.vmax = spd * nm / 3600. 
+        else:
+            self.vmin = spd * nm / 3600. 
 
     def SetCDmethod(self, method=""):
         if method is "":

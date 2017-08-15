@@ -177,6 +177,12 @@ def init(sim, traf, scr):
             traf.asas.toggle,
             "Airborne Separation Assurance System switch"
         ],
+        "ASASV": [
+            "ASASV MAX/MIN SPD",
+            "[txt,float]",
+            traf.asas.limits,
+            "Airborne Separation Assurance System Speed"
+        ],
         "AT": [
             "acid AT wpname [DEL] SPD/ALT [spd/alt]",
             "acid,wpinroute,[txt,txt]",
