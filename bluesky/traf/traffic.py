@@ -868,35 +868,36 @@ class Traffic(DynamicArrays):
     def UpdateTrafCflLog(self):
         # Bool-array with aircraft in conflict
         inconf = np.array([len(ids) > 0 for ids in self.asas.iconf])
+        if len(inconf) > 0:
         
-        # Aircraft Info
-        self.cflid      = [i for (i, v) in zip(self.id, inconf) if v]
-        
-        # Positions
-        self.cfllat     = self.lat[inconf]
-        self.cfllon     = self.lon[inconf]
-        self.cflalt     = self.alt[inconf]
-        self.cflhdg     = self.hdg[inconf]
-
-        # Velocities
-        self.cfltas     = self.tas[inconf]
-        self.cflgs      = self.gs[inconf]
-        self.cflcas     = self.cas[inconf]
-        self.cflM       = self.M[inconf]
-
-        # Traffic autopilot settings
-        self.cflapalt   = self.apalt[inconf]
-        self.cflaspd    = self.aspd[inconf]
-        self.cflaptas   = self.aptas[inconf]
-        self.cflaphdg   = self.aphdg[inconf]
-        
-        # Traffic ASAS settings
-        self.cflasasspd = self.asas.spd[inconf]
-        self.cflasashdg = self.asas.trk[inconf]
-
-        # Efficiency related variables
-        self.cfldist    = self.dist[inconf]
-        self.cflwork    = self.work[inconf]
+            # Aircraft Info
+            self.cflid      = [i for (i, v) in zip(self.id, inconf) if v]
+            
+            # Positions
+            self.cfllat     = self.lat[inconf]
+            self.cfllon     = self.lon[inconf]
+            self.cflalt     = self.alt[inconf]
+            self.cflhdg     = self.hdg[inconf]
+    
+            # Velocities
+            self.cfltas     = self.tas[inconf]
+            self.cflgs      = self.gs[inconf]
+            self.cflcas     = self.cas[inconf]
+            self.cflM       = self.M[inconf]
+    
+            # Traffic autopilot settings
+            self.cflapalt   = self.apalt[inconf]
+            self.cflaspd    = self.aspd[inconf]
+            self.cflaptas   = self.aptas[inconf]
+            self.cflaphdg   = self.aphdg[inconf]
+            
+            # Traffic ASAS settings
+            self.cflasasspd = self.asas.spd[inconf]
+            self.cflasashdg = self.asas.trk[inconf]
+    
+            # Efficiency related variables
+            self.cfldist    = self.dist[inconf]
+            self.cflwork    = self.work[inconf]
         
     def UpdateEvtLog(self, evt='', idx=None):
         # Because of RegisterLogParameters evtstr is set to ['']
