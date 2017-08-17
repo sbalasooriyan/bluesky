@@ -914,6 +914,31 @@ class Traffic(DynamicArrays):
             call_log = True
 
         elif evt == 'del':
+            # If in conflict, remove conflict first by looping through conflicts
+            for i in range(len(self.asas.iconf[idx])):
+                # Sort conf-pair
+                srt = sorted(self.asas.confpairs[self.asas.iconf[idx][i]])
+                # Entry in conflist
+                entry = srt[0] + " " + srt[1]
+                # Could be that the conflict-pair is already removed from list
+                if entry in self.asas.conflist_now:
+                    # Remove from conflist_now
+                    self.asas.conflist_now.remove(entry)
+                    # Log conf-deletion by recursive call
+                    self.UpdateEvtLog('updateconf')
+            # If in LoSs, remove LoS first by looping through LoSs
+            for i in range(len(self.asas.ilos[idx])):
+                # Sort conf-pair
+                srt = sorted(self.asas.lospairs[self.asas.ilos[idx][i]])
+                # Entry in conflist
+                entry = srt[0] + " " + srt[1]
+                # Could be that the LoS-pair is already removed from list
+                if entry in self.asas.LOSlist_now:
+                    # Remove from losflist_now
+                    self.asas.LOSlist_now.remove(entry)
+                    # Log LoS-deletion by recursive call
+                    self.UpdateEvtLog('updateconf')
+            
             # Event description
             self.evtstr.append('Deleted ' + self.id[idx])
             self.UpdateSkyLog('DEL AC', idx)
@@ -927,10 +952,10 @@ class Traffic(DynamicArrays):
             # Get created and removed LoS
             cre_los = [x for x in self.asas.LOSlist_now if x not in self.evtlos]
             del_los = [x for x in self.evtlos if x not in self.asas.LOSlist_now]
-            # Store conflict list
-            self.evtcfl = self.asas.conflist_now
-            # Store LoS list
-            self.evtlos = self.asas.LOSlist_now
+            # Store conflict list (Copy it, don't point at it)
+            self.evtcfl = self.asas.conflist_now[:]
+            # Store LoS list (Copy it, don't point at it)
+            self.evtlos = self.asas.LOSlist_now[:]
             # Check if created or removed
             if len(cre_cfl) > 0:
                 for i in range(len(cre_cfl)):
@@ -952,16 +977,16 @@ class Traffic(DynamicArrays):
                 for i in range(len(del_cfl)):
                     ac1, ac2 = del_cfl[i].split(' ')
                     self.evtstr.append('Conflict ended between ' + ac1 + ' and ' + ac2)
-                    self.UpdateSkyLog('CFL END ' + ac2, self.id2idx(ac1))
-                    self.UpdateSkyLog('CFL END ' + ac1, self.id2idx(ac2))
+                    self.UpdateSkyLog('CFL ENDED ' + ac2, self.id2idx(ac1))
+                    self.UpdateSkyLog('CFL ENDED ' + ac1, self.id2idx(ac2))
                     # Logger must be called
                     call_log = True
             if len(del_los) > 0:
                 for i in range(len(del_los)):
                     ac1, ac2 = del_los[i].split(' ')
                     self.evtstr.append('LoS ended between ' + ac1 + ' and ' + ac2)
-                    self.UpdateSkyLog('LOS END ' + ac2, self.id2idx(ac1))
-                    self.UpdateSkyLog('LOS END ' + ac1, self.id2idx(ac2))
+                    self.UpdateSkyLog('LOS ENDED ' + ac2, self.id2idx(ac1))
+                    self.UpdateSkyLog('LOS ENDED ' + ac1, self.id2idx(ac2))
                     # Logger must be called
                     call_log = True
 
