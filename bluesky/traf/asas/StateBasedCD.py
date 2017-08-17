@@ -19,6 +19,8 @@ def detect(dbconf, traf, simt):
     dbconf.latowncpa    = []
     dbconf.lonowncpa    = []
     dbconf.altowncpa    = []
+    dbconf.ilos         = [[] for ac in range(traf.ntraf)]
+    dbconf.lospairs     = []
 
     dbconf.LOSlist_now  = []
     dbconf.conflist_now = []
@@ -168,32 +170,34 @@ def detect(dbconf, traf, simt):
         # Add to Conflict and LOSlist, to count total conflicts and LOS
 
         # NB: if only one A/C detects a conflict, it is also added to these lists
-        combi = str(traf.id[i]) + " " + str(traf.id[j])
-        combi2 = str(traf.id[j]) + " " + str(traf.id[i])
+        srt = sorted([str(traf.id[i]),str(traf.id[j])])
+        combi = srt[0] + " " + srt[1]
 
         experimenttime = simt > 2100 and simt < 5700  # These parameters may be
         # changed to count only conflicts within a given expirement time window
 
-        if combi not in dbconf.conflist_all and combi2 not in dbconf.conflist_all:
+        if combi not in dbconf.conflist_all:
             dbconf.conflist_all.append(combi)
 
-        if combi not in dbconf.conflist_exp and combi2 not in dbconf.conflist_exp and experimenttime:
+        if combi not in dbconf.conflist_exp and experimenttime:
             dbconf.conflist_exp.append(combi)
 
-        if combi not in dbconf.conflist_now and combi2 not in dbconf.conflist_now:
+        if combi not in dbconf.conflist_now:
             dbconf.conflist_now.append(combi)
 
         if LOS:
-            if combi not in dbconf.LOSlist_all and combi2 not in dbconf.LOSlist_all:
+            dbconf.ilos[i].append(idx)
+            dbconf.lospairs.append((traf.id[i], traf.id[j]))
+            if combi not in dbconf.LOSlist_all:
                 dbconf.LOSlist_all.append(combi)
                 dbconf.LOSmaxsev.append(0.)
                 dbconf.LOShmaxsev.append(0.)
                 dbconf.LOSvmaxsev.append(0.)
 
-            if combi not in dbconf.LOSlist_exp and combi2 not in dbconf.LOSlist_exp and experimenttime:
+            if combi not in dbconf.LOSlist_exp and experimenttime:
                 dbconf.LOSlist_exp.append(combi)
 
-            if combi not in dbconf.LOSlist_now and combi2 not in dbconf.LOSlist_now:
+            if combi not in dbconf.LOSlist_now:
                 dbconf.LOSlist_now.append(combi)
 
             # Now, we measure intrusion and store it if it is the most severe
