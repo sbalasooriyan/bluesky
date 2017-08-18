@@ -306,8 +306,10 @@ def constructSSD(dbconf, traf, priocode = "FF1"):
                         ARV_rota = pc_rota.Execute(pyclipper.CT_DIFFERENCE, pyclipper.PFT_NONZERO, pyclipper.PFT_NONZERO)
                         pc2.AddPaths(ARV_rota, pyclipper.PT_CLIP, True)
                     else:
-                        # Put the ARV in there
-                        pc2.AddPaths(ARV, pyclipper.PT_CLIP, True)
+                        # Put the ARV in there, make sure it's not empty
+                        if len(ARV) > 0:
+                            pc2.AddPaths(ARV, pyclipper.PT_CLIP, True)
+
                 # Scale back
                 ARV = pyclipper.scale_from_clipper(ARV)
                 
