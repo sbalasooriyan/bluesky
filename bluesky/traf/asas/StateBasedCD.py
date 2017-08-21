@@ -186,8 +186,8 @@ def detect(dbconf, traf, simt):
             dbconf.conflist_now.append(combi)
 
         if LOS:
+            # idx refers to confpairs!
             dbconf.ilos[i].append(idx)
-            dbconf.lospairs.append((traf.id[i], traf.id[j]))
             if combi not in dbconf.LOSlist_all:
                 dbconf.LOSlist_all.append(combi)
                 dbconf.LOSmaxsev.append(0.)

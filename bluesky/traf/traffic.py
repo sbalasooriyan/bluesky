@@ -928,8 +928,8 @@ class Traffic(DynamicArrays):
                     self.UpdateEvtLog('updateconf')
             # If in LoSs, remove LoS first by looping through LoSs
             for i in range(len(self.asas.ilos[idx])):
-                # Sort conf-pair
-                srt = sorted(self.asas.lospairs[self.asas.ilos[idx][i]])
+                # Sort los-pair, idx refers to confpairs!
+                srt = sorted(self.asas.confpairs[self.asas.ilos[idx][i]])
                 # Entry in conflist
                 entry = srt[0] + " " + srt[1]
                 # Could be that the LoS-pair is already removed from list
