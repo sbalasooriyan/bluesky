@@ -18,7 +18,6 @@ from simevents import ACDataEvent, RouteDataEvent, PanZoomEvent, \
                         SimInfoEvent, StackTextEvent, ShowDialogEvent, DisplayFlagEvent, \
                         PanZoomEventType, DisplayShapeEvent
 
-
 class ScreenIO(QObject):
     """Class within sim task which sends/receives data to/from GUI task"""
 
@@ -83,6 +82,13 @@ class ScreenIO(QObject):
             
     def suba(self, cmd_text):
         if self.manager.isActive():
+            # Copy flag
+            copy = False
+            if cmd_text[:4] == 'COPY':
+                # Copy flag
+                copy = True
+                # Remove COPY from cmd_text
+                cmd_text = cmd_text[5:]
             # Check whether first four letters are "exec"
             if cmd_text[:4] == 'EXEC':
                 # Execute custom things (discontinued)
@@ -107,6 +113,11 @@ class ScreenIO(QObject):
                     
                 ##
                 output = output.replace(", '",",\n'")
+            # Check copy-flag
+            if copy:
+                # Copy output to clipboard
+                suba_fun.clipboard("set", output)
+                
             # Display
             self.manager.sendEvent(StackTextEvent(disptext=output))
 

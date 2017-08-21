@@ -129,3 +129,44 @@ def cmd_eval_correct(selfobj, cmd_text, output):
     output += '\n' + 'Corrected command-line:\n>> ' + cmd_text
     # Return
     return output, cmd_text
+
+def clipboard(oper="get", data=""):
+    # From https://stackoverflow.com/a/3429034
+
+    # Imports
+    import ctypes
+    
+    # Open Cliboard
+    ctypes.windll.user32.OpenClipboard(None)
+    
+    # Check if we get or set Clipboard
+    if oper == "get":
+        # Get clipboard
+        pcontents = ctypes.windll.user32.GetClipboardData(1)
+        # Decode
+        data = ctypes.c_char_p(pcontents).value
+        # Close clipboard
+        ctypes.windll.user32.CloseClipboard
+        # Return data
+        return data
+    elif oper == "set":
+        # Empty Clipboard
+        ctypes.windll.user32.EmptyClipboard()
+        # Allocate memory
+        hcd = ctypes.windll.kernel32.GlobalAlloc(0x2000, len(bytes(data)) + 1)
+        # Lock memory
+        pchData = ctypes.windll.kernel32.GlobalLock(hcd)
+        # Encode and copy
+        ctypes.cdll.msvcrt.strcpy(ctypes.c_char_p(pchData), bytes(data))
+        # Free memory
+        ctypes.windll.kernel32.GlobalUnlock(hcd)
+        # Set Clipboard
+        ctypes.windll.user32.SetClipboardData(1, hcd)
+        # Close clipboard
+        ctypes.windll.user32.CloseClipboard()
+        # Return Succes
+        return True
+    else:
+        print "Invalid arg in clipboard"
+        # Return Fail
+        return False
