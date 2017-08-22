@@ -47,6 +47,7 @@ class ASAS(DynamicArrays):
         with RegisterElementParameters(self):
             # ASAS info per aircraft:
             self.iconf    = []            # index in 'conflicting' aircraft database
+            self.ilos     = []            # index in 'los' aircraft database
 
             self.active   = np.array([], dtype=bool)  # whether the autopilot follows ASAS or not
             self.trk      = np.array([])  # heading provided by the ASAS [deg]

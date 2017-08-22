@@ -304,7 +304,8 @@ def constructSSD(dbconf, traf, priocode = "FF1"):
                     if priocode == "FF3":
                         # Calculate ARV for RotA
                         ARV_rota = pc_rota.Execute(pyclipper.CT_DIFFERENCE, pyclipper.PFT_NONZERO, pyclipper.PFT_NONZERO)
-                        pc2.AddPaths(ARV_rota, pyclipper.PT_CLIP, True)
+                        if len(ARV_rota) > 0:                        
+                            pc2.AddPaths(ARV_rota, pyclipper.PT_CLIP, True)
                     else:
                         # Put the ARV in there, make sure it's not empty
                         if len(ARV) > 0:

@@ -14,13 +14,12 @@ def detect(dbconf, traf, simt):
 
     # Reset lists before new CD
     dbconf.iconf        = [[] for ac in range(traf.ntraf)]
+    dbconf.ilos         = [[] for ac in range(traf.ntraf)]
     dbconf.nconf        = 0
     dbconf.confpairs    = []
     dbconf.latowncpa    = []
     dbconf.lonowncpa    = []
     dbconf.altowncpa    = []
-    dbconf.ilos         = [[] for ac in range(traf.ntraf)]
-    dbconf.lospairs     = []
 
     dbconf.LOSlist_now  = []
     dbconf.conflist_now = []
