@@ -52,8 +52,8 @@ methods = ['OFF-OFF','MVP-OFF','SSD-FF1','SSD-FF2','SSD-FF3','SSD-FF4','SSD-FF5'
 vranges = [[450.0,500.0],[300.0,500.0]]
 
 # Traffic densities and repetitions of each density
-minDensity     = 1.00         # [ac/10,000 NM^2]
-maxDensity     = 5.0         # [ac/10,000 NM^2]
+minDensity     = 5.00         # [ac/10,000 NM^2]
+maxDensity     = 10.0         # [ac/10,000 NM^2]
 numDensities   = 2 
 numRepetitions = 10
 

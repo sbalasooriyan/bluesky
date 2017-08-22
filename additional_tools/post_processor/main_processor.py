@@ -33,18 +33,24 @@ class ProcessedData:
         self.mcfl_max = np.array(self.mcfl_max)
 
 # Sanity checks
-def sanity(data, data_type):
+def sanity(data, data_type, log):
     if not nAC == sum(data[:,2] == 'CRE AC'):
+        print log
         print "Not all AC created?"
     if not nAC == sum(data[:,2] == 'DEL AC'):
+        print log
         print "Not all AC deleted?"
     if not sum(data_type == 0) == 0:
+        print log
         print "Unknown entry encountered"
     if not sum(data_type == 1) == sum(data_type == 2):
+        print log
         print "CRE and DEL not equal"
     if not sum(data_type == 3) % 4 == 0:
+        print log
         print "CFL not divisible by 4"
     if not sum(data_type == 4) % 4 == 0:
+        print log
         print "LOS not divisible by 4"
     return
 
@@ -89,7 +95,7 @@ for log in logFiles:
         data_type[i] = conv[data[i,2][:3]]
     
     # Perform sanity check
-    sanity(data, data_type)
+    sanity(data, data_type, log)
     
     # Make array for flying AC
     fly = np.zeros(nAC, dtype=bool)
@@ -109,11 +115,13 @@ for log in logFiles:
         idx = int(data[i,1][2:]) - 1
         if data_type[i] == 1:
             if fly[idx]:
+                print log
                 print data[i,1] + " already created"
             else:
                 fly[idx] = True
         elif data_type[i] == 2:
             if not fly[idx]:
+                print log
                 print data[i,1] + " already deleted or not existent"
             else:
                 fly[idx] = False
@@ -121,6 +129,7 @@ for log in logFiles:
             ido = int(data[i,2][12:]) - 1
             if data[i,2][4:9] == "START":
                 if ido in cfl[idx]:
+                    print log
                     print str(i) + ": " + data[i,1] + " already in CFL with " + data[i,2][10:]
                     print idx, ido
                     print data[i,2]
@@ -133,6 +142,7 @@ for log in logFiles:
                     cfl_hist[idx].append(ido)
             elif data[i,2][4:9] == "ENDED":
                 if not ido in cfl[idx]:
+                    print log
                     print str(i) + ": " + data[i,1] + " not in CFL with " + data[i,2][10:]
                     print idx, ido
                     print data[i,2]
@@ -144,6 +154,7 @@ for log in logFiles:
             ido = int(data[i,2][12:]) - 1
             if data[i,2][4:9] == "START":
                 if ido in los[idx]:
+                    print log
                     print str(i) + ": " + data[i,1] + " already in LOS with " + data[i,2][10:]
                     print idx, ido
                     print data[i,2]
@@ -156,6 +167,7 @@ for log in logFiles:
                     los_hist[idx].append(ido)
             elif data[i,2][4:9] == "ENDED":
                 if not ido in los[idx]:
+                    print log
                     print str(i) + ": " + data[i,1] + " not in LOS with " + data[i,2][10:]
                     print idx, ido
                     print data[i,2]
