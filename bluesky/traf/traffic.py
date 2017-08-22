@@ -514,6 +514,11 @@ class Traffic(DynamicArrays):
         self.perf.delete(idx)
         self.area.delete(idx)
         return True
+    
+    def delete_all(self):
+        """Delete all aircraft"""
+        for i in range(self.ntraf-1,-1,-1):
+            self.delete(self.id[i])
 
     def update(self, simt, simdt):
         # Update only if there is traffic ---------------------

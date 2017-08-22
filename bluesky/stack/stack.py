@@ -244,9 +244,10 @@ def init(sim, traf, scr):
             "Define a waypoint only for this scenario/run"
         ],
         "DEL": [
-            "DEL acid/WIND/shape",
+            "DEL acid/ALL/WIND/shape",
             "txt",
             lambda a:   traf.delete(a)    if traf.id.count(a) > 0 \
+                   else traf.delete_all() if a == "ALL" \
                    else traf.wind.clear() if a == "WIND" \
                    else areafilter.deleteArea(scr, a),
             "Delete command (aircraft, wind, area)"
