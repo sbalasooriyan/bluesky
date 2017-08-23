@@ -27,8 +27,9 @@ def settingsWriter(method,vrange,tMax,settingsFilesDir):
     lines = []
     
     # Times
-    tZero = tim2txt(0)
-    tMax  = tim2txt(tMax)
+    tZero  = tim2txt(0)
+    tMaxA  = tim2txt(tMax)
+    tMaxB  = tim2txt(tMax + 30.)
     
     
     #%% Step 1: Append settings header to 'lines' list
@@ -68,13 +69,14 @@ def settingsWriter(method,vrange,tMax,settingsFilesDir):
 
     #%% Step 4: Append log settings
 #    lines.append(tZero + ">SNAPLOG ON\n")
-    lines.append(tZero + ">CFLLOG ON\n")
+#    lines.append(tZero + ">CFLLOG ON\n")
 #    lines.append(tZero + ">EVTLOG ON\n")
     lines.append(tZero + ">SKYLOG ON\n")
-#    lines.append(tMax + ">SNAPLOG OFF\n")
-    lines.append(tMax + ">CFLLOG OFF\n")
-#    lines.append(tMax + ">EVTLOG OFF\n")
-    lines.append(tMax + ">SKYLOG OFF\n")
+#    lines.append(tMaxB + ">SNAPLOG OFF\n")
+#    lines.append(tMaxB + ">CFLLOG OFF\n")
+#    lines.append(tMaxB + ">EVTLOG OFF\n")
+    lines.append(tMaxA + ">DEL ALL\n")
+    lines.append(tMaxB + ">SKYLOG OFF\n")
 
     #%% Step 5: Write 'lines' list to Scenario file
     

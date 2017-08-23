@@ -1,11 +1,13 @@
 '''
-main_processor.py
+processor.py
 
-This script processes the log-files
+This script processes the log-files. Returns an object containing all data
+needed for plotting and analysis.
 '''
 
 import os
 import numpy as np
+import pickle
 import pandas
 
 # Class processed data
@@ -21,6 +23,7 @@ class ProcessedData:
         self.los_sum = []
         self.mcfl = []
         self.mcfl_max = []
+        self.nac = []
     
     def numpify(self):
         self.method = np.array(self.method)
@@ -31,9 +34,10 @@ class ProcessedData:
         self.los_sum = np.array(self.los_sum)
         self.mcfl = np.array(self.mcfl)
         self.mcfl_max = np.array(self.mcfl_max)
+        self.nac = np.array(self.nac, dtype=np.float32)
 
 # Sanity checks
-def sanity(data, data_type, log):
+def sanity(data, data_type, log, nAC):
     if not nAC == sum(data[:,2] == 'CRE AC'):
         print log
         print "Not all AC created?"
@@ -55,7 +59,8 @@ def sanity(data, data_type, log):
     return
 
 # Storage folders for log-files
-logFilesDir = './output/'
+logFilesDir = './output_inst227/'
+pdFileName  = 'pd.pickle'
 
 # ProcessedData
 PD = ProcessedData()
@@ -95,7 +100,7 @@ for log in logFiles:
         data_type[i] = conv[data[i,2][:3]]
     
     # Perform sanity check
-    sanity(data, data_type, log)
+    sanity(data, data_type, log, nAC)
     
     # Make array for flying AC
     fly = np.zeros(nAC, dtype=bool)
@@ -203,20 +208,8 @@ for log in logFiles:
     PD.los_sum.append(los_sum)
     PD.mcfl.append(sum(cfl_count>1))
     PD.mcfl_max.append(max(cfl_count))
+    PD.nac.append(nAC)
 
 
-
-colnames = np.unique(np.array(sorted(PD.method)))
-rownames = np.array(["CFL","LOS","AC with MCFL","MCFL_max"])
-PD.numpify()
-show_data = np.zeros((rownames.shape[0],colnames.shape[0]))
-for i in range(show_data.shape[1]):
-    ind = PD.method == colnames[i]
-    N = float(sum(ind))
-    show_data[0,i] = np.sum(PD.cfl_sum[ind])/N
-    show_data[1,i] = np.sum(PD.los_sum[ind])/N
-    show_data[2,i] = np.sum(PD.mcfl[ind])/N
-    show_data[3,i] = np.sum(PD.mcfl_max[ind])/N
-
-pandas.set_option('expand_frame_repr', False)
-print pandas.DataFrame(show_data,rownames,colnames)
+with open(pdFileName, 'wb') as handle:
+    pickle.dump(PD, handle, protocol=pickle.HIGHEST_PROTOCOL)

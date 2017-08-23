@@ -43,7 +43,7 @@ print "\033[4mRunning main_generate.py\033[0m"
 execfile("settings.py")
 
 # Use pickled data, or recompute (even if pickle exists)?
-recompute = True
+recompute = False
 countdown = 0
 
 # CR-methods and rules separated by hyphen
@@ -187,7 +187,7 @@ if recompute:
                         simLat, simLon, sepMinimum, dataFilesDir)
 else:
     # Get the names of the OD pickles
-    routePickles = [f for f in os.listdir(dataFilesDir) if f.count("Rep")>0 and f.count(".od")>0]    
+    routePickles = [f for f in os.listdir(dataFilesDir) if f.count("rep")>0 and f.count(".sp")>0]    
     
     # Sanity check: check if the number of OD pickles is correct
     if len(routePickles) != len(densities)*numRepetitions:
