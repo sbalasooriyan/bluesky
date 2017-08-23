@@ -9,6 +9,7 @@ from ...tools.aero import nm
 
 
 def detect(dbconf, traf, simt):
+
     if not dbconf.swasas:
         return
 
@@ -34,6 +35,10 @@ def detect(dbconf, traf, simt):
     dbconf.qdr  = np.array(qdlst[0])  # degrees
     I           = np.eye(traf.ntraf)  # Identity matric of order ntraf
     dbconf.dist = np.array(qdlst[1]) * nm + 1e9 * I  # meters i to j
+    # Flat-earth approximation. Causes bugs otherwise, dirty-fix
+    # This line makes sure the difference between corresponding bearing is 180deg
+    dbconf.qdr *= 180.*np.ones((dbconf.qdr.shape)) / abs(dbconf.qdr - dbconf.qdr.T + np.eye(dbconf.qdr.shape[0]))
+
 
     # Transmission noise
     if traf.adsb.transnoise:
@@ -89,37 +94,39 @@ def detect(dbconf, traf, simt):
     # swhorconf = swhorconf*(touthor>0)*(tinhor<dbconf.dtlook)
 
     # Vertical conflict -----------------------------------------------------------
-
+##### DISREGARD VERTICAL CONFLICTS FOR NOW
     # Vertical crossing of disk (-dh,+dh)
-    alt = traf.alt.reshape((1, traf.ntraf))
-    adsbalt = traf.adsb.alt.reshape((1, traf.ntraf))
-    if traf.adsb.transnoise:
-        # error in the determined altitude of other a/c
-        alterror = np.random.normal(0, traf.adsb.transerror[2], traf.alt.shape)  # degrees
-        adsbalt += alterror
+#    alt = traf.alt.reshape((1, traf.ntraf))
+#    adsbalt = traf.adsb.alt.reshape((1, traf.ntraf))
+#    if traf.adsb.transnoise:
+#        # error in the determined altitude of other a/c
+#        alterror = np.random.normal(0, traf.adsb.transerror[2], traf.alt.shape)  # degrees
+#        adsbalt += alterror
 
-    dbconf.dalt = alt - adsbalt.T
-
-
-    vs = traf.vs.reshape(1, len(traf.vs))
+#    dbconf.dalt = alt - adsbalt.T
 
 
-    avs = traf.adsb.vs.reshape(1, len(traf.adsb.vs))
+#    vs = traf.vs.reshape(1, len(traf.vs))
 
-    dvs = vs - avs.T
+
+#    avs = traf.adsb.vs.reshape(1, len(traf.adsb.vs))
+
+#    dvs = vs - avs.T
 
     # Check for passing through each others zone
-    dvs = np.where(np.abs(dvs) < 1e-6, 1e-6, dvs)  # prevent division by zero
-    tcrosshi = (dbconf.dalt + dbconf.dh) / -dvs
-    tcrosslo = (dbconf.dalt - dbconf.dh) / -dvs
+#    dvs = np.where(np.abs(dvs) < 1e-6, 1e-6, dvs)  # prevent division by zero
+#    tcrosshi = (dbconf.dalt + dbconf.dh) / -dvs
+#    tcrosslo = (dbconf.dalt - dbconf.dh) / -dvs
 
-    tinver = np.minimum(tcrosshi, tcrosslo)
-    toutver = np.maximum(tcrosshi, tcrosslo)
+#    tinver = np.minimum(tcrosshi, tcrosslo)
+#    toutver = np.maximum(tcrosshi, tcrosslo)
 
     # Combine vertical and horizontal conflict-------------------------------------
-    dbconf.tinconf = np.maximum(tinver, tinhor)
 
-    dbconf.toutconf = np.minimum(toutver, touthor)
+#    dbconf.tinconf = np.maximum(tinver, tinhor)
+    dbconf.tinconf = tinhor##
+#    dbconf.toutconf = np.minimum(toutver, touthor)
+    dbconf.toutconf = touthor##
 
     swconfl = swhorconf * (dbconf.tinconf <= dbconf.toutconf) * \
         (dbconf.toutconf > 0.) * (dbconf.tinconf < dbconf.dtlookahead) \
@@ -157,10 +164,11 @@ def detect(dbconf, traf, simt):
         dbconf.lonowncpa.append(lono)
         dbconf.altowncpa.append(alto)
 
-        dx = (traf.lat[i] - traf.lat[j]) * 111319.
-        dy = (traf.lon[i] - traf.lon[j]) * 111319.
-
-        hdist2 = dx**2 + dy**2
+#        dx = (traf.lat[i] - traf.lat[j]) * 111319.
+#        dy = (traf.lon[i] - traf.lon[j]) * 111319.
+#
+#        hdist2 = dx**2 + dy**2
+        hdist2 = dbconf.dist[i,j] * dbconf.dist[i,j]
         hLOS   = hdist2 < dbconf.R**2
         vdist  = abs(traf.alt[i] - traf.alt[j])
         vLOS   = vdist < dbconf.dh
@@ -172,14 +180,17 @@ def detect(dbconf, traf, simt):
         srt = sorted([str(traf.id[i]),str(traf.id[j])])
         combi = srt[0] + " " + srt[1]
 
-        experimenttime = simt > 2100 and simt < 5700  # These parameters may be
+#        experimenttime = simt > 2100 and simt < 5700  # These parameters may be
         # changed to count only conflicts within a given expirement time window
 
         if combi not in dbconf.conflist_all:
             dbconf.conflist_all.append(combi)
+        
+        if combi not in dbconf.confstart:
+            dbconf.confstart[combi] = simt
 
-        if combi not in dbconf.conflist_exp and experimenttime:
-            dbconf.conflist_exp.append(combi)
+#        if combi not in dbconf.conflist_exp and experimenttime:
+#            dbconf.conflist_exp.append(combi)
 
         if combi not in dbconf.conflist_now:
             dbconf.conflist_now.append(combi)
@@ -189,31 +200,43 @@ def detect(dbconf, traf, simt):
             dbconf.ilos[i].append(idx)
             if combi not in dbconf.LOSlist_all:
                 dbconf.LOSlist_all.append(combi)
-                dbconf.LOSmaxsev.append(0.)
-                dbconf.LOShmaxsev.append(0.)
-                dbconf.LOSvmaxsev.append(0.)
+                
+            
+            severity = 1.0 - np.sqrt(hdist2) / dbconf.R                
+            if combi not in dbconf.LOSmaxsev:
+                dbconf.LOSmaxsev[combi] = severity
+                dbconf.LOSstart[combi]  = simt
+            else:
+                # Update severity
+                if severity > dbconf.LOSmaxsev[combi]:
+                    dbconf.LOSmaxsev[combi] = severity
+#                dbconf.LOSmaxsev.append(0.)
+#                dbconf.LOShmaxsev.append(0.)
+#                dbconf.LOSvmaxsev.append(0.)
 
-            if combi not in dbconf.LOSlist_exp and experimenttime:
-                dbconf.LOSlist_exp.append(combi)
-
+#            if combi not in dbconf.LOSlist_exp and experimenttime:
+#                dbconf.LOSlist_exp.append(combi)
+            
             if combi not in dbconf.LOSlist_now:
                 dbconf.LOSlist_now.append(combi)
+                
+                
 
-            # Now, we measure intrusion and store it if it is the most severe
-            Ih = 1.0 - np.sqrt(hdist2) / dbconf.R
-            Iv = 1.0 - vdist / dbconf.dh
-            severity = min(Ih, Iv)
-
-            try:  # Only continue if combi is found in LOSlist (and not combi2)
-                idx = dbconf.LOSlist_all.index(combi)
-            except:
-                idx = -1
-
-            if idx >= 0:
-                if severity > dbconf.LOSmaxsev[idx]:
-                    dbconf.LOSmaxsev[idx]  = severity
-                    dbconf.LOShmaxsev[idx] = Ih
-                    dbconf.LOSvmaxsev[idx] = Iv
+#            # Now, we measure intrusion and store it if it is the most severe
+#            Ih = 1.0 - np.sqrt(hdist2) / dbconf.R
+#            Iv = 1.0 - vdist / dbconf.dh
+#            severity = min(Ih, Iv)
+#
+#            try:  # Only continue if combi is found in LOSlist (and not combi2)
+#                idx = dbconf.LOSlist_all.index(combi)
+#            except:
+#                idx = -1
+#
+#            if idx >= 0:
+#                if severity > dbconf.LOSmaxsev[idx]:
+#                    dbconf.LOSmaxsev[idx]  = severity
+#                    dbconf.LOShmaxsev[idx] = Ih
+#                    dbconf.LOSvmaxsev[idx] = Iv
 
     # Convert to numpy arrays for vectorisation
     dbconf.latowncpa = np.array(dbconf.latowncpa)

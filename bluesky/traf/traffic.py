@@ -207,6 +207,10 @@ class Traffic(DynamicArrays):
             # Efficiency related variables
             self.skydist    = np.array([])   # Horizontal flight distance [m]
             self.skywork    = np.array([])   # Work Done [J]
+
+            # Efficiency related variables
+            self.skydur     = np.array([])   # Duration of event [s]
+            self.skysev     = np.array([])   # Severity (in LOS-events) [-]
             
         with datalog.registerLogParameters('EVTLOG', self):
             # Event Info
@@ -981,17 +985,26 @@ class Traffic(DynamicArrays):
             if len(del_cfl) > 0:
                 for i in range(len(del_cfl)):
                     ac1, ac2 = del_cfl[i].split(' ')
-                    self.evtstr.append('Conflict ended between ' + ac1 + ' and ' + ac2)
-                    self.UpdateSkyLog('CFL ENDED ' + ac2, self.id2idx(ac1))
-                    self.UpdateSkyLog('CFL ENDED ' + ac1, self.id2idx(ac2))
+                    # Starttime info
+                    dur = self.asas.confstart[del_cfl[i]]
+                    del self.asas.confstart[del_cfl[i]] # Delete from dict
+                    self.evtstr.append('Conflict ended between ' + ac1 + ' and ' + ac2 + '. Start ' + str(round(dur,3)) + 's.')
+                    self.UpdateSkyLog('CFL ENDED ' + ac2, self.id2idx(ac1), dur)
+                    self.UpdateSkyLog('CFL ENDED ' + ac1, self.id2idx(ac2), dur)
                     # Logger must be called
                     call_log = True
             if len(del_los) > 0:
                 for i in range(len(del_los)):
                     ac1, ac2 = del_los[i].split(' ')
-                    self.evtstr.append('LoS ended between ' + ac1 + ' and ' + ac2)
-                    self.UpdateSkyLog('LOS ENDED ' + ac2, self.id2idx(ac1))
-                    self.UpdateSkyLog('LOS ENDED ' + ac1, self.id2idx(ac2))
+                    # Starttime info
+                    dur = self.asas.LOSstart[del_los[i]]
+                    del self.asas.LOSstart[del_los[i]] # Delete from dict
+                    # Severity info
+                    sev = self.asas.LOSmaxsev[del_los[i]]
+                    del self.asas.LOSmaxsev[del_los[i]] # Delete from dict
+                    self.evtstr.append('LoS ended between ' + ac1 + ' and ' + ac2 + '. Start ' + str(round(dur,3)) + 's. Severity ' + str(round(sev,3)) + 's.')
+                    self.UpdateSkyLog('LOS ENDED ' + ac2, self.id2idx(ac1), dur, sev)
+                    self.UpdateSkyLog('LOS ENDED ' + ac1, self.id2idx(ac2), dur, sev)
                     # Logger must be called
                     call_log = True
 
@@ -1002,7 +1015,7 @@ class Traffic(DynamicArrays):
             # Reset output string
             self.evtstr = []
         
-    def UpdateSkyLog(self, evt, idx):
+    def UpdateSkyLog(self, evt, idx, dur=0, sev=0):
         
         # Aircraft Info
         self.skyid      = [self.id[idx]]
@@ -1034,6 +1047,10 @@ class Traffic(DynamicArrays):
         # Efficiency related variables
         self.skydist    = self.dist[[idx]]
         self.skywork    = self.work[[idx]]
+
+        # Efficiency related variables
+        self.skydur     = np.array([dur])   # Duration of event [s]
+        self.skysev     = np.array([sev])   # Severity (in LOS-events) [-]
         
         # Call the logger
         self.skylog.log()

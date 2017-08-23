@@ -112,11 +112,14 @@ class ASAS(DynamicArrays):
         self.LOSlist_exp  = []  # List of all Losses Of Separation in experiment time
         self.conflist_now = []  # List of current Conflicts
         self.LOSlist_now  = []  # List of current Losses Of Separation
+        self.LOSmaxsev    = {}  # Dict of max severity in current Losses Of Separation
+        self.confstart    = {}  # Dict of start-times current Conflicts
+        self.LOSstart     = {}  # Dict of start-times current Losses Of Separation
 
-        # For keeping track of locations with most severe intrusions
-        self.LOSmaxsev    = []
-        self.LOShmaxsev   = []
-        self.LOSvmaxsev   = []
+#        # For keeping track of locations with most severe intrusions
+#        self.LOSmaxsev    = []
+#        self.LOShmaxsev   = []
+#        self.LOSvmaxsev   = []
         
         # For SSD 
         self.asasn        = np.array([])               # [m/s] North resolution speed from ASAS

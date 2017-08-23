@@ -78,7 +78,9 @@ def skyHeader():
                "Pilot SPD (TAS) [m/s], " + \
                "Pilot HDG [deg]," + \
                "Distance [m], " + \
-               "Work [J]"
+               "Work [J]" + \
+               "StartTime [s], " + \
+               "Severity [-]"
 
   lines      = "#######################################################\n" + \
                "SKY LOG\n" + \
