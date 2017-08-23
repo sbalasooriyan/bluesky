@@ -66,3 +66,4 @@ data/coefficients/BADA/*
 ssd.obj
 *.sp
 *.scn
+*.pickle
