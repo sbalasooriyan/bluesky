@@ -36,6 +36,29 @@ class ProcessedData:
         self.mcfl_max = np.array(self.mcfl_max)
         self.nac = np.array(self.nac, dtype=np.float32)
 
+class ACData:
+    """ Class holding AC-data """
+    
+    def __init__(self):
+        self.id   = []
+        self.cfl  = []
+        self.los  = []
+        self.mcfl = []
+        self.t0   = []
+        self.t1   = []
+        self.work = []
+        self.dist = []
+    
+    def add(self):
+        self.id.append(None)
+        self.cfl.append(None)
+        self.los.append(None)
+        self.mcfl.append(None)
+        self.t0.append(None)
+        self.t1.append(None)
+        self.work.append(None)
+        self.dist.append(None)
+
 # Sanity checks
 def sanity(data, data_type, log, nAC):
     if not nAC == sum(data[:,2] == 'CRE AC'):
@@ -60,7 +83,7 @@ def sanity(data, data_type, log, nAC):
 
 # Storage folders for log-files
 logFilesDir = './output_inst227/'
-pdFileName  = 'pd.pickle'
+pdFileName  = 'pd1.pickle'
 
 # ProcessedData
 PD = ProcessedData()
@@ -70,6 +93,8 @@ logFiles = [f for f in os.listdir(logFilesDir) if f.count(".log")>0 and f.count(
 
 
 for log in logFiles:
+    # Print progress
+    print 'Processing (%d/%d): %s' %(logFiles.index(log)+1,len(logFiles),log)
     #log = logFiles[1]
     # Isolate scenario-name
     scn, _, _ = log.split(";")
