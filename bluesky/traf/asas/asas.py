@@ -370,10 +370,13 @@ class ASAS(DynamicArrays):
         self.alt[-n:] = self.traf.alt[-n:]
 
 
-    def update(self, simt):
+    def update(self, simt, override=False):
         iconf0 = np.array(self.iconf)
         
-#        print "Im in asas. ntraf is ", self.traf.ntraf        
+#        print "Im in asas. ntraf is ", self.traf.ntraf 
+        # Unscheduled: due to override
+        if override:
+            self.cd.detect(self, self.traf, simt)
         
         # Scheduling: update when dt has passed
         if self.swasas and simt >= self.tasas:

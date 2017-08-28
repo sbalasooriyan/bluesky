@@ -443,6 +443,12 @@ class Traffic(DynamicArrays):
         
         # Logger
         self.UpdateEvtLog('cre', -1)
+        
+        # Detect potential new conflict by overriding asas-updatesuper(Traffic,self).simt
+        # (should be simt instead of self.asas.tasas)
+        self.asas.update(self.asas.tasas, True)
+        self.UpdateTrafCflLog()
+        self.UpdateEvtLog('updateconf')
 
         return True
 
