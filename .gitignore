@@ -67,3 +67,5 @@ ssd.obj
 *.sp
 *.scn
 *.pickle
+*.ini
+*.pickle
