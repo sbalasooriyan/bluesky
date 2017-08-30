@@ -76,11 +76,13 @@ def skyHeader():
                "Pilot ALT [m], " + \
                "Pilot SPD (CAS) [m/s], " + \
                "Pilot SPD (TAS) [m/s], " + \
-               "Pilot HDG [deg]," + \
+               "Pilot HDG [deg], " + \
                "Distance [m], " + \
                "Work [J], " + \
                "StartTime [s], " + \
-               "Severity [-]"
+               "Severity [-], " + \
+               "Ntraf SIM [-], " + \
+               "Ntraf EXPT [-]"
 
   lines      = "#######################################################\n" + \
                "SKY LOG\n" + \

@@ -1,7 +1,7 @@
 import numpy as np
 from math import *
 from random import random, randint
-from ..tools import datalog, geo, logHeader
+from ..tools import datalog, geo, logHeader, areafilter
 from ..tools.misc import latlon2txt
 from ..tools.aero import fpm, kts, ft, g0, Rearth, nm, \
                          vatmos,  vtas2cas, vtas2mach, casormach, vcasormach
@@ -211,6 +211,10 @@ class Traffic(DynamicArrays):
             # Efficiency related variables
             self.skydur     = np.array([])   # Duration of event [s]
             self.skysev     = np.array([])   # Severity (in LOS-events) [-]
+
+            # Density related variables
+            self.skynsim    = np.array([])   # Number of aircraft in SIMAREA
+            self.skynexpt   = np.array([])   # Number of aircraft in EXPTAREA
             
         with datalog.registerLogParameters('EVTLOG', self):
             # Event Info
@@ -444,11 +448,11 @@ class Traffic(DynamicArrays):
         # Logger
         self.UpdateEvtLog('cre', -1)
         
-        # Detect potential new conflict by overriding asas-updatesuper(Traffic,self).simt
-        # (should be simt instead of self.asas.tasas)
-        self.asas.update(self.asas.tasas, True)
-        self.UpdateTrafCflLog()
-        self.UpdateEvtLog('updateconf')
+#        # Detect potential new conflict by overriding asas-updatesuper(Traffic,self).simt
+#        # (should be simt instead of self.asas.tasas)
+#        self.asas.update(self.asas.tasas, True)
+#        self.UpdateTrafCflLog()
+#        self.UpdateEvtLog('updateconf')
 
         return True
 
@@ -1057,6 +1061,20 @@ class Traffic(DynamicArrays):
         # Efficiency related variables
         self.skydur     = np.array([dur])   # Duration of event [s]
         self.skysev     = np.array([sev])   # Severity (in LOS-events) [-]
+        
+        # Density related variables
+        if 'SIMAREA' in areafilter.areas:
+            inside = areafilter.checkInside('SIMAREA', self.lat, self.lon, self.alt)
+            # Total number of instantaneous aircraft inside area
+            self.skynsim = np.array([sum(inside)])
+        else:
+            self.skynsim = np.array([0])        
+        if 'EXPTAREA' in areafilter.areas:
+            inside = areafilter.checkInside('EXPTAREA', self.lat, self.lon, self.alt)
+            # Total number of instantaneous aircraft inside area
+            self.skynexpt = np.array([sum(inside)])
+        else:
+            self.skynexpt = np.array([0])
         
         # Call the logger
         self.skylog.log()
