@@ -110,9 +110,8 @@ distAvg      = (distMin+distMax)/2.0
 tMax = (distMax/TASmin + scenarioDuration + 0.5) * 3600.
 
 # Experiment and Simulation area sizing [NM] or [NM^2]
-#   Currently Expt and Simulation are set to be the same
 sideLengthExpt = 3.0*distMin
-sideLengthSim  = 3.0*distMin
+sideLengthSim  = 4.0*distMin
 areaExpt       = sideLengthExpt**2
 areaSim        = sideLengthSim**2
 
@@ -253,7 +252,7 @@ print "Writing area definition file"
     
 # Call the areaWriter function. It uses trafScript commands to specify the 
 # area in which aircraft are allowed to fly.
-areaWriter(simLat, simLon, alt + (alt-altDel), altDel, simAreaFactor, scenarioFilesDir)
+areaWriter(exptLat, exptLon, simLat, simLon, alt + (alt-altDel), altDel, simAreaFactor, scenarioFilesDir)
     
     
 #%% Print out the total time taken for generating all the scnearios

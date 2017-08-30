@@ -20,7 +20,7 @@ that the pushing out effect is reduces for CRON cases.
 # import necessary packages
 import os
 
-def areaWriter(simLat, simLon, altMax, altDel, simAreaFactor, scenarioFilesDir):
+def areaWriter(exptLat, exptLon, simLat, simLon, altMax, altDel, simAreaFactor, scenarioFilesDir):
     
     # Initialize list to store trafScript commands
     lines = []
@@ -43,6 +43,8 @@ def areaWriter(simLat, simLon, altMax, altDel, simAreaFactor, scenarioFilesDir):
     # BlueSky command
     lines.append("00:00:00.00>BOX,SIMAREA" + "," + str(-simLat) + "," + str(-simLon) + "," + str(simLat) + "," + str(simLon) + "," + str(altMax+100.0) +"," + str(altDel)+ "\n")
     lines.append("00:00:00.00>AREA,SIMAREA \n")
+    lines.append("00:00:00.00>BOX,EXPTAREA" + "," + str(-exptLat) + "," + str(-exptLon) + "," + str(exptLat) + "," + str(exptLon) + "," + str(altMax+100.0) +"," + str(altDel)+ "\n")
+    
 
 
     

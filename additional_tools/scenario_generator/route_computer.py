@@ -102,7 +102,7 @@ def routeComputer(density, repetition, nacInst, nacTotal, spawnInterval, scenari
         dumDestLat, dumDestLon = qdrpos(dumOriginLat, dumOriginLon, heading[i], distance[i])
         
         # Check if the destination is outside the sim area square
-        outside = not checkInside(simLat, simLon, dumDestLat, dumDestLon)
+        outside = not checkInside(exptLat, exptLon, dumDestLat, dumDestLon)
         
         # Calculate current distance of existing aircraft [NM]
         curdistance = TASground[exist] * (spawnTimes[i] - spawnTimes[exist]) / 3600
@@ -127,7 +127,7 @@ def routeComputer(density, repetition, nacInst, nacTotal, spawnInterval, scenari
             dumDestLat, dumDestLon = qdrpos(dumOriginLat, dumOriginLon, heading[i], distance[i])
             
             # check is destination is inside
-            outside = not checkInside(simLat, simLon, dumDestLat, dumDestLon)
+            outside = not checkInside(exptLat, exptLon, dumDestLat, dumDestLon)
             
             # Check if inside rects
             tooClose = not checkOutRect(cLat, cLon, dumOriginLat, dumOriginLon)
