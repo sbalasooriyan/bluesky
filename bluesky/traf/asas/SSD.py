@@ -28,6 +28,8 @@ def start(dbconf):
 
 def detect(dbconf, traf):
     """ Detect all current conflicts """
+    # Currently all detection-codelines are commented out. Statebased simply
+    # much faster!!!
     
     # Check if ASAS is ON first!    
     if not dbconf.swasas:
@@ -51,11 +53,13 @@ def resolve(dbconf, traf):
         # Use STATEBASED CD then
         dbconf.inconf = np.array([len(ids) > 0 for ids in dbconf.iconf])
     
-    # Construct the SSD
+    # Construct the SSD (twice in sequential methods)
+    if dbconf.priocode == "FF8":
+        constructSSD(dbconf, traf, "FF1")
     constructSSD(dbconf, traf, dbconf.priocode)
     
     # Get resolved speed-vector
-    if dbconf.priocode == "FF1" or dbconf.priocode == "FF2" or dbconf.priocode == "FF3" or dbconf.priocode == "FF4" or dbconf.priocode == "FF5" or dbconf.priocode == "FF6" or dbconf.priocode == "FF7":
+    if dbconf.priocode == "FF1" or dbconf.priocode == "FF2" or dbconf.priocode == "FF3" or dbconf.priocode == "FF4" or dbconf.priocode == "FF5" or dbconf.priocode == "FF6" or dbconf.priocode == "FF7" or dbconf.priocode == "FF8":
         resolve_closest(dbconf, traf)
             
     
@@ -85,12 +89,18 @@ def initializeSSD(dbconf, traf):
     dbconf.ARV          = [None] * traf.ntraf
     # For calculation purposes
     dbconf.ARV_calc     = [None] * traf.ntraf
+    dbconf.ARV_calc2    = [None] * traf.ntraf
+    dbconf.inrange      = [None] * traf.ntraf
+    dbconf.indist       = [None] * traf.ntraf
+    dbconf.inqdr        = [None] * traf.ntraf
+    dbconf.inrange2     = [None] * traf.ntraf
     dbconf.inconf       = np.zeros(traf.ntraf, dtype=bool)
+    dbconf.inconf2      = np.zeros(traf.ntraf, dtype=bool)
     dbconf.asasn        = np.zeros(traf.ntraf, dtype=np.float32)
     dbconf.asase        = np.zeros(traf.ntraf, dtype=np.float32)
     dbconf.FRV_area     = np.zeros(traf.ntraf, dtype=np.float32)
     dbconf.ARV_area     = np.zeros(traf.ntraf, dtype=np.float32)
-    dbconf.confmatrix   = np.zeros((traf.ntraf, traf.ntraf), dtype=bool)
+#    dbconf.confmatrix   = np.zeros((traf.ntraf, traf.ntraf), dtype=bool)
 
 def area(vset):
     # Initialize A as it could be calculated iteratively
@@ -120,6 +130,8 @@ def constructSSD(dbconf, traf, priocode = "FF1"):
     hsepm   = hsep * margin         # [m] Horizontal separation with safety margin
     alpham  = 0.4999 * np.pi        # [rad] Maximum half-angle for VO
     adsbmax = 200 * 1000            # [m] Maximum ADS-B range
+    if priocode == "FF8":
+        adsbmax /= 2
     
     # Relevant info from traf
     gsnorth = traf.gsnorth
@@ -131,6 +143,13 @@ def constructSSD(dbconf, traf, priocode = "FF1"):
     gs_ap   = traf.ap.tas
     hdg_ap  = traf.ap.trk
     
+    # Local variables, will be put into dbconf later
+    FRV_loc          = [None] * traf.ntraf
+    ARV_loc          = [None] * traf.ntraf
+    # For calculation purposes
+    ARV_calc_loc     = [None] * traf.ntraf
+    FRV_area_loc     = np.zeros(traf.ntraf, dtype=np.float32)
+    ARV_area_loc     = np.zeros(traf.ntraf, dtype=np.float32)
         
     # # Use velocity limits for the ring-shaped part of the SSD
     # Discretize the circles using points on circle
@@ -148,12 +167,12 @@ def constructSSD(dbconf, traf, priocode = "FF1"):
     # If only one aircraft
     elif ntraf == 1:
         # Map them into the format ARV wants. Outercircle CCW, innercircle CW
-        dbconf.ARV[0] = circle_lst
-        dbconf.FRV[0] = []
-        dbconf.ARV_calc[0] = dbconf.ARV[0]
+        ARV_loc[0] = circle_lst
+        FRV_loc[0] = []
+        ARV_calc_loc[0] = ARV_loc[0]
         # Calculate areas and store in dbconf
-        dbconf.FRV_area[0] = 0
-        dbconf.ARV_area[0] = np.pi * (vmax **2 - vmin ** 2)
+        FRV_area_loc[0] = 0
+        ARV_area_loc[0] = np.pi * (vmax **2 - vmin ** 2)
         return
         
     # Function qdrdist_matrix needs 4 vectors as input (lat1,lon1,lat2,lon2)
@@ -175,6 +194,7 @@ def constructSSD(dbconf, traf, priocode = "FF1"):
     dist = dist * nm
     
     # In LoS the VO can't be defined, act as if dist is on edge
+    dist_ori = dist[:]
     dist[dist < hsepm] = hsepm
     
     # Calculate vertices of Velocity Obstacle (CCW)
@@ -214,12 +234,12 @@ def constructSSD(dbconf, traf, priocode = "FF1"):
             if len(ind) == 0:
                 # No aircraft in the vicinity
                 # Map them into the format ARV wants. Outercircle CCW, innercircle CW
-                dbconf.ARV[i] = circle_lst
-                dbconf.FRV[i] = []
-                dbconf.ARV_calc[i] = dbconf.ARV[i]
+                ARV_loc[i] = circle_lst
+                FRV_loc[i] = []
+                ARV_calc_loc[i] = ARV_loc[i]
                 # Calculate areas and store in dbconf
-                dbconf.FRV_area[i] = 0
-                dbconf.ARV_area[i] = np.pi * (vmax **2 - vmin ** 2)
+                FRV_area_loc[i] = 0
+                ARV_area_loc[i] = np.pi * (vmax **2 - vmin ** 2)
             else:
                 # The i's of the other aircraft
                 i_other = np.delete(np.arange(0, ntraf), i)
@@ -228,6 +248,13 @@ def constructSSD(dbconf, traf, priocode = "FF1"):
                 # Now account for ADS-B range in indices of other aircraft (i_other)
                 ind = ind[ac_adsb]
                 i_other = i_other[ac_adsb]
+                if not priocode == "FF8":
+                    # Put it in class-object (not for FF8)
+                    dbconf.inrange[i]  = i_other
+                    dbconf.indist[i]   = dist_ori[ind]
+                    dbconf.inqdr[i]    = qdr[ind]
+                else:
+                    dbconf.inrange2[i] = i_other
 #                # Distances between aircraft pairs
 #                dist_pair = dist[ind]
                 # VO from 2 to 1 is mirror of 1 to 2. Only 1 to 2 can be constructed in
@@ -269,9 +296,8 @@ def constructSSD(dbconf, traf, priocode = "FF1"):
                 # Add each other other aircraft to clipper as clip
                 for j in range(np.shape(i_other)[0]):
 #                    print "AC0" + str(i) + " - AC0" + str(i_other[j])
-#                    print dist_pair[j]
-#                    print brg_own[j]
-#                    print brg_other[j]
+#                    print dist[ind[j]]
+#                    print adsbmax
                     # Normally VO shall be added of this other a/c
                     VO = pyclipper.scale_to_clipper(map(tuple,xy[j,:,:]))
                     pc.AddPath(VO, pyclipper.PT_CLIP, True)
@@ -285,8 +311,12 @@ def constructSSD(dbconf, traf, priocode = "FF1"):
                             pc_rota.AddPath(VO, pyclipper.PT_CLIP, True)
                     # Detect conflicts, store in confmatrix
                     # Returns 0 if false, -1 if pt is on poly and +1 if pt is in poly.
-                    if pyclipper.PointInPolygon(pyclipper.scale_to_clipper((gseast[i],gsnorth[i])),VO):
-                        dbconf.confmatrix[i,i_other[j]] = True
+#                    if pyclipper.PointInPolygon(pyclipper.scale_to_clipper((gseast[i],gsnorth[i])),VO):
+#                        dbconf.confmatrix[i,i_other[j]] = True
+                    # Detect conf for smaller layer in FF8
+                    if priocode == "FF8":
+                        if pyclipper.PointInPolygon(pyclipper.scale_to_clipper((gseast[i],gsnorth[i])),VO):
+                            dbconf.inconf2[i] = True
                         
                 
                     
@@ -297,7 +327,7 @@ def constructSSD(dbconf, traf, priocode = "FF1"):
 #                N += 1
                     
                 
-                if not priocode == "FF1":
+                if not priocode == "FF1" and not priocode == "FF8":
                     # Make another clipper object for extra intersections
                     pc2 = pyclipper.Pyclipper()
                     # When using RotA clip with pc_rota
@@ -318,22 +348,22 @@ def constructSSD(dbconf, traf, priocode = "FF1"):
                 if len(ARV) == 0:
                     # No aircraft in the vicinity
                     # Map them into the format ARV wants. Outercircle CCW, innercircle CW
-                    dbconf.ARV[i] = []
-                    dbconf.FRV[i] = circle_lst
-                    dbconf.ARV_calc[i] = []
+                    ARV_loc[i] = []
+                    FRV_loc[i] = circle_lst
+                    ARV_calc_loc[i] = []
                     # Calculate areas and store in dbconf
-                    dbconf.FRV_area[i] = np.pi * (vmax **2 - vmin ** 2)
-                    dbconf.ARV_area[i] = 0
+                    FRV_area_loc[i] = np.pi * (vmax **2 - vmin ** 2)
+                    ARV_area_loc[i] = 0
                 elif len(FRV) == 0:
                     # Should not happen with one a/c or no other a/c in the vicinity.
                     # These are handled earlier. Happens when RotA has removed all
                     # Map them into the format ARV wants. Outercircle CCW, innercircle CW
-                    dbconf.ARV[i] = circle_lst
-                    dbconf.FRV[i] = []
-                    dbconf.ARV_calc[i] = circle_lst
+                    ARV_loc[i] = circle_lst
+                    FRV_loc[i] = []
+                    ARV_calc_loc[i] = circle_lst
                     # Calculate areas and store in dbconf
-                    dbconf.FRV_area[i] = 0
-                    dbconf.ARV_area[i] = np.pi * (vmax **2 - vmin ** 2)
+                    FRV_area_loc[i] = 0
+                    ARV_area_loc[i] = np.pi * (vmax **2 - vmin ** 2)
                 else:
                     # Check multi exteriors, if this layer is not a list, it means it has no exteriors
                     # In that case, make it a list, such that its format is consistent with further code
@@ -342,11 +372,11 @@ def constructSSD(dbconf, traf, priocode = "FF1"):
                     if not type(ARV[0][0]) == list:
                         ARV = [ARV]
                     # Store in dbconf 
-                    dbconf.FRV[i] = FRV
-                    dbconf.ARV[i] = ARV
+                    FRV_loc[i] = FRV
+                    ARV_loc[i] = ARV
                     # Calculate areas and store in dbconf
-                    dbconf.FRV_area[i] = area(FRV)
-                    dbconf.ARV_area[i] = area(ARV)
+                    FRV_area_loc[i] = area(FRV)
+                    ARV_area_loc[i] = area(ARV)
                 
                     # For resolution purposes sometimes extra intersections are wanted
                     if priocode == "FF2" or priocode == "FF7" or priocode == "FF3" or priocode == "FF5" or priocode == "FF6":
@@ -395,11 +425,22 @@ def constructSSD(dbconf, traf, priocode = "FF1"):
                     else:
                         ARV_calc = ARV
                     # Update calculatable ARV for resolutions                    
-                    dbconf.ARV_calc[i] = ARV_calc
-#            print N
+                    ARV_calc_loc[i] = ARV_calc
+
     # Update inconf if CD is set to SSD
-    if dbconf.cd_name == "SSD":
-        dbconf.inconf = np.sum(dbconf.confmatrix, axis=0) > 0
+#    if dbconf.cd_name == "SSD":
+#        dbconf.inconf = np.sum(dbconf.confmatrix, axis=0) > 0
+
+    # If sequential (layered) approach, the local might me put elsewhere
+    if not priocode == "FF8":
+        dbconf.FRV          = FRV_loc
+        dbconf.ARV          = ARV_loc
+        dbconf.ARV_calc     = ARV_calc_loc
+        dbconf.FRV_area     = FRV_area_loc
+        dbconf.ARV_area     = ARV_area_loc
+    else:
+        dbconf.ARV_calc2    = ARV_calc_loc
+        
     return
         
 
@@ -411,6 +452,8 @@ def resolve_closest(dbconf, traf):
     # It's just linalg, however credits to: http://stackoverflow.com/a/1501725
     # Variables
     ARV = dbconf.ARV_calc
+    if dbconf.priocode == "FF8":
+        ARV2 = dbconf.ARV_calc2
     # Select AP-setting as point
     if dbconf.priocode == "FF4":
         gsnorth = np.cos(traf.ap.trk / 180 * np.pi) * traf.ap.tas
@@ -424,6 +467,7 @@ def resolve_closest(dbconf, traf):
     for i in range(ntraf):
         # Only those that are in conflict need to resolve
         if dbconf.inconf[i] and len(ARV[i]) > 0:
+            
             # Loop through all exteriors and append. Afterwards concatenate
             p = []
             q = []
@@ -444,13 +488,53 @@ def resolve_closest(dbconf, traf):
             t = np.clip(t, 0., 1.)
             t[same] = 0.
             # Calculate closest point to each edge
-            x = p[:,0] + t * q[:,0]
-            y = p[:,1] + t * q[:,1]
+            x1 = p[:,0] + t * q[:,0]
+            y1 = p[:,1] + t * q[:,1]
             # Get distance squared
-            d2 = (x - gseast[i]) ** 2 + (y - gsnorth[i]) ** 2
+            d2 = (x1 - gseast[i]) ** 2 + (y1 - gsnorth[i]) ** 2
             # Sort distance
             ind = np.argsort(d2)
+            x1  = x1[ind]
+            y1  = y1[ind]
             
+            if dbconf.priocode == "FF8" and dbconf.inconf2[i]:
+                # Loop through all exteriors and append. Afterwards concatenate
+                p = []
+                q = []
+                for j in range(len(ARV2[i])):
+                    p.append(np.array(ARV2[i][j]))
+                    q.append(np.diff(np.row_stack((p[j], p[j][0])), axis=0))
+                p = np.concatenate(p)
+                q = np.concatenate(q)
+                # Calculate squared distance between edges
+                l2 = np.sum(q ** 2, axis=1)
+                # Catch l2 == 0 (exception)
+                same = l2 < 1e-8
+                l2[same] = 1.
+                # Calc t
+                t = np.sum((np.array([gseast[i], gsnorth[i]]) - p) * q, axis=1) / l2
+                # Speed of boolean indices only slightly faster (negligible)
+                # t must be limited between 0 and 1
+                t = np.clip(t, 0., 1.)
+                t[same] = 0.
+                # Calculate closest point to each edge
+                x2 = p[:,0] + t * q[:,0]
+                y2 = p[:,1] + t * q[:,1]
+                # Get distance squared
+                d2 = (x2 - gseast[i]) ** 2 + (y2 - gsnorth[i]) ** 2
+                # Sort distance
+#                print x1[0:10]
+#                print y1[0:10]
+#                print x2[0:10]
+#                print y2[0:10]
+                ind = np.argsort(d2)
+                x2  = x2[ind]
+                y2  = y2[ind]
+                d2  = d2[ind]
+#                print x1[0:10]
+#                print y1[0:10]
+#                print x2[0:10]
+#                print y2[0:10]
 # NOW HANDLED BY ARV_calc!!
             # Check right-turning
 #            if priocode > 0:
@@ -469,8 +553,46 @@ def resolve_closest(dbconf, traf):
 #                    ind = ind[bool_right]
             
             # Store result in dbconf
-            dbconf.asase[i] = x[ind[0]]
-            dbconf.asasn[i] = y[ind[0]]
+            if not dbconf.priocode == "FF8" or not dbconf.inconf2[i]:
+                dbconf.asase[i] = x1[0]
+                dbconf.asasn[i] = y1[0]
+            else:
+                # Sequential method, check if both result in very similar resolutions
+                if (x1[0] - x2[0])*(x1[0] - x2[0]) + (x1[0] - x2[0])*(x1[0] - x2[0]) < 1:
+                    # In that case take the full layer
+                    dbconf.asase[i] = x1[0]
+                    dbconf.asasn[i] = y1[0]
+                else:
+                    # In that case take the partial layer solution and see which
+                    # results in lower TLOS
+                    dbconf.asase[i] = x1[0]
+                    dbconf.asasn[i] = y1[0]
+                    # dv2 for the FF1-solution
+                    dist12 = (x1[0] - gseast[i]) ** 2 + (y1[0] - gsnorth[i]) ** 2
+                    # distances for the partial layer solution stored in d2
+                    ind = d2 < dist12
+                    if sum(ind) == 1:
+                        dbconf.asase[i] = x2[0]
+                        dbconf.asasn[i] = y2[0]
+                    elif sum(ind) > 1:
+                        x2 = x2[d2 < dist12]
+                        y2 = y2[d2 < dist12]
+#                        # Get solution with minimum TLOS
+#                        dbconf.asase[i] = x1[0]
+#                        dbconf.asasn[i] = y1[0]
+                        
+                        i_other = dbconf.inrange[i]
+                        idx = minTLOS(dbconf, traf, i, i_other, x1, y1, x2, y2)
+                        # Get solution with maximum TLOS
+                        dbconf.asase[i] = x2[idx]
+                        dbconf.asasn[i] = y2[idx]
+                    else:
+                        print "ERROR SHOULD NOT BE HAPPENING"
+                        print x1
+                        print y1
+                        print x2
+                        print y2
+                        asdasd
             
             # resoeval should be set to True now
             if not dbconf.asaseval:
@@ -501,6 +623,46 @@ def qdrdist_matrix_indices(ntraf):
     ind2 = np.cumsum(ind2, out=ind2)
     return ind1, ind2
 
+def minTLOS(dbconf, traf, i, i_other, x1, y1, x2, y2):
+#    x = np.concatenate(([x1[0]],x2))
+#    y = np.concatenate(([y1[0]],y2))
+    x=x2
+    y=y2
+    # Get speeds of other AC in range
+    x_other = traf.gseast[i_other]
+    y_other = traf.gsnorth[i_other]
+    # Get relative bearing [deg] and distance [nm]
+    qdr, dist = geo.qdrdist(traf.lat[i], traf.lon[i], traf.lat[i_other], traf.lon[i_other])
+    # Convert to SI
+    qdr = np.deg2rad(qdr)
+    dist *= nm
+    # For vectorization, store lengths as W and L
+    W = np.shape(x)[0]
+    L = np.shape(x_other)[0]
+    # Relative speed-components
+    du = np.dot(x_other.reshape((L,1)),np.ones((1,W))) - np.dot(np.ones((L,1)),x.reshape((1,W)))
+    dv = np.dot(y_other.reshape((L,1)),np.ones((1,W))) - np.dot(np.ones((L,1)),y.reshape((1,W)))
+    # Relative speed + zero check
+    vrel2 = du * du + dv * dv
+    vrel2 = np.where(np.abs(vrel2) < 1e-6, 1e-6, vrel2)  # limit lower absolute value
+    # X and Y distance
+    dx = np.dot(np.reshape(dist*np.sin(qdr),(L,1)),np.ones((1,W)))
+    dy = np.dot(np.reshape(dist*np.cos(qdr),(L,1)),np.ones((1,W)))
+    # Time to CPA
+    tcpa = -(du * dx + dv * dy) / vrel2
+    # CPA distance
+    dcpa2 = np.square(np.dot(dist.reshape((L,1)),np.ones((1,W)))) - np.square(tcpa) * vrel2
+    # Calculate time to LOS
+    R2 = dbconf.R * dbconf.R
+    swhorconf = dcpa2 < R2
+    dxinhor = np.sqrt(np.maximum(0,R2-dcpa2))
+    dtinhor = dxinhor / np.sqrt(vrel2)
+    tinhor = np.where(swhorconf, tcpa-dtinhor, 0.)
+    tinhor = np.where(tinhor > 0, tinhor, 1e6)
+    # Get index of best solution
+    idx = np.argmax(np.sum(tinhor,0))
+    
+    return idx
 #import pickle    
 #    
 #
