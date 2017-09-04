@@ -170,3 +170,20 @@ def clipboard(oper="get", data=""):
         print "Invalid arg in clipboard"
         # Return Fail
         return False
+
+def coords(C, output):
+    # Empty coordstring
+    clip = ""
+    # Fill coord-string
+    for i in range(len(C)):
+        for j in range(len(C[i])):
+            clip += str(C[i][j][0]) + "\t" + str(C[i][j][1]) + "\n"
+            if j + 1 == len(C[i]):
+                clip += str(C[i][0][0]) + "\t" + str(C[i][0][1])
+        if not i + 1 == len(C):
+            clip += "\n\n"
+    # To clipboard
+    clipboard("set", clip)
+    # Output
+    output += "\nCoordinates copied successfully"
+    return output

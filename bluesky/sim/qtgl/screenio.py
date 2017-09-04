@@ -95,9 +95,19 @@ class ScreenIO(QObject):
                 output = 1;
                 if not type(output) == 'str':
                     output = str(output)
+            elif cmd_text[:5] == 'COORD':
+                # Remove COPY from cmd_text
+                cmd_text = cmd_text[6:]
+                # Send cmd_text to cmd_eval, which runs the first parse
+                output, cmd_text = suba_fun.cmd_eval(self, cmd_text)
+                try:
+                    array = eval(cmd_text)
+                    output = suba_fun.coords(array, output)
+                except:
+                    output += "\nFailed to copy coordinates"
             else:
                 # Send cmd_text to cmd_eval, which runs the first parse
-                output, cmd_text = suba_fun.cmd_eval(self,cmd_text)
+                output, cmd_text = suba_fun.cmd_eval(self, cmd_text)
                 try:
                     cmd_res = str(eval(cmd_text))
                 except:
