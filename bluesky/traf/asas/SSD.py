@@ -87,12 +87,10 @@ def initializeSSD(dbconf, traf):
     # Need to do it here, since ASAS.reset doesn't know ntraf
     dbconf.FRV          = [None] * traf.ntraf
     dbconf.ARV          = [None] * traf.ntraf
-    # For calculation purposes
+    # For calculation purposes. Index 2 for sequential solutions (FF8)
     dbconf.ARV_calc     = [None] * traf.ntraf
     dbconf.ARV_calc2    = [None] * traf.ntraf
     dbconf.inrange      = [None] * traf.ntraf
-    dbconf.indist       = [None] * traf.ntraf
-    dbconf.inqdr        = [None] * traf.ntraf
     dbconf.inrange2     = [None] * traf.ntraf
     dbconf.inconf       = np.zeros(traf.ntraf, dtype=bool)
     dbconf.inconf2      = np.zeros(traf.ntraf, dtype=bool)
@@ -129,7 +127,9 @@ def constructSSD(dbconf, traf, priocode = "FF1"):
     margin  = dbconf.mar            # [-] Safety margin for evasion
     hsepm   = hsep * margin         # [m] Horizontal separation with safety margin
     alpham  = 0.4999 * np.pi        # [rad] Maximum half-angle for VO
+    betalos = np.pi / 4             # [rad] Minimum divertion angle for LOS
     adsbmax = 200 * 1000            # [m] Maximum ADS-B range
+    beta    =  np.pi/4 + betalos/2
     if priocode == "FF8":
         adsbmax /= 2
     
@@ -194,7 +194,6 @@ def constructSSD(dbconf, traf, priocode = "FF1"):
     dist = dist * nm
     
     # In LoS the VO can't be defined, act as if dist is on edge
-    dist_ori = dist[:]
     dist[dist < hsepm] = hsepm
     
     # Calculate vertices of Velocity Obstacle (CCW)
@@ -251,8 +250,6 @@ def constructSSD(dbconf, traf, priocode = "FF1"):
                 if not priocode == "FF8":
                     # Put it in class-object (not for FF8)
                     dbconf.inrange[i]  = i_other
-                    dbconf.indist[i]   = dist_ori[ind]
-                    dbconf.inqdr[i]    = qdr[ind]
                 else:
                     dbconf.inrange2[i] = i_other
 #                # Distances between aircraft pairs
@@ -295,11 +292,32 @@ def constructSSD(dbconf, traf, priocode = "FF1"):
                     
                 # Add each other other aircraft to clipper as clip
                 for j in range(np.shape(i_other)[0]):
-#                    print "AC0" + str(i) + " - AC0" + str(i_other[j])
+#                    Debug prints
+#                    print traf.id[i] + " - " + traf.id[i_other[j]]
 #                    print dist[ind[j]]
-#                    print adsbmax
-                    # Normally VO shall be added of this other a/c
-                    VO = pyclipper.scale_to_clipper(map(tuple,xy[j,:,:]))
+                    # Scale VO when not in LOS
+                    if dist[ind[j]] > hsepm:
+                        # Normally VO shall be added of this other a/c
+                        VO = pyclipper.scale_to_clipper(map(tuple,xy[j,:,:]))
+                    else:
+                        # Pair is in LOS, instead of triangular VO, use darttip
+                        # Check if bearing should be mirrored
+                        if i_other[j] < i:
+                            qdr_los = qdr[ind[j]] + np.pi
+                        else:
+                            qdr_los = qdr[ind[j]]
+                        # Length of inner-leg of darttip
+                        leg = 1.1 * vmax / np.cos(beta) * np.array([1,1,1,0])
+                        # Angles of darttip
+                        angles_los = np.array([qdr_los + 2 * beta, qdr_los, qdr_los - 2 * beta, 0.])
+                        # Calculate coordinates (CCW)
+                        x_los = leg * np.sin(angles_los)
+                        y_los = leg * np.cos(angles_los)
+                        # Put in array of correct format
+                        xy_los = np.vstack((x_los,y_los)).T
+                        # Scale darttip
+                        VO = pyclipper.scale_to_clipper(map(tuple,xy_los))
+                    # Add scaled VO to clipper
                     pc.AddPath(VO, pyclipper.PT_CLIP, True)
                     # For RotA it is possible to ignore
                     if priocode == "FF3":
@@ -523,18 +541,10 @@ def resolve_closest(dbconf, traf):
                 # Get distance squared
                 d2 = (x2 - gseast[i]) ** 2 + (y2 - gsnorth[i]) ** 2
                 # Sort distance
-#                print x1[0:10]
-#                print y1[0:10]
-#                print x2[0:10]
-#                print y2[0:10]
                 ind = np.argsort(d2)
                 x2  = x2[ind]
                 y2  = y2[ind]
                 d2  = d2[ind]
-#                print x1[0:10]
-#                print y1[0:10]
-#                print x2[0:10]
-#                print y2[0:10]
 # NOW HANDLED BY ARV_calc!!
             # Check right-turning
 #            if priocode > 0:
