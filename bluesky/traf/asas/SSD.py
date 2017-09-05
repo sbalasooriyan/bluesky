@@ -56,10 +56,12 @@ def resolve(dbconf, traf):
     # Construct the SSD (twice in sequential methods)
     if dbconf.priocode == "FF8":
         constructSSD(dbconf, traf, "FF1")
+    if dbconf.priocode == "FF9":
+        constructSSD(dbconf, traf, "FF4")
     constructSSD(dbconf, traf, dbconf.priocode)
     
     # Get resolved speed-vector
-    if dbconf.priocode == "FF1" or dbconf.priocode == "FF2" or dbconf.priocode == "FF3" or dbconf.priocode == "FF4" or dbconf.priocode == "FF5" or dbconf.priocode == "FF6" or dbconf.priocode == "FF7" or dbconf.priocode == "FF8":
+    if dbconf.priocode == "FF1" or dbconf.priocode == "FF2" or dbconf.priocode == "FF3" or dbconf.priocode == "FF4" or dbconf.priocode == "FF5" or dbconf.priocode == "FF6" or dbconf.priocode == "FF7" or dbconf.priocode == "FF8" or dbconf.priocode == "FF9":
         resolve_closest(dbconf, traf)
             
     
@@ -87,7 +89,7 @@ def initializeSSD(dbconf, traf):
     # Need to do it here, since ASAS.reset doesn't know ntraf
     dbconf.FRV          = [None] * traf.ntraf
     dbconf.ARV          = [None] * traf.ntraf
-    # For calculation purposes. Index 2 for sequential solutions (FF8)
+    # For calculation purposes. Index 2 for sequential solutions (FF8, FF9)
     dbconf.ARV_calc     = [None] * traf.ntraf
     dbconf.ARV_calc2    = [None] * traf.ntraf
     dbconf.inrange      = [None] * traf.ntraf
@@ -98,6 +100,8 @@ def initializeSSD(dbconf, traf):
     dbconf.asase        = np.zeros(traf.ntraf, dtype=np.float32)
     dbconf.FRV_area     = np.zeros(traf.ntraf, dtype=np.float32)
     dbconf.ARV_area     = np.zeros(traf.ntraf, dtype=np.float32)
+    dbconf.ap_free      = np.ones(traf.ntraf, dtype=bool)
+#    dbconf.ap_free2     = np.ones(traf.ntraf, dtype=bool)
 #    dbconf.confmatrix   = np.zeros((traf.ntraf, traf.ntraf), dtype=bool)
 
 def area(vset):
@@ -127,10 +131,10 @@ def constructSSD(dbconf, traf, priocode = "FF1"):
     margin  = dbconf.mar            # [-] Safety margin for evasion
     hsepm   = hsep * margin         # [m] Horizontal separation with safety margin
     alpham  = 0.4999 * np.pi        # [rad] Maximum half-angle for VO
-    betalos = np.pi / 4             # [rad] Minimum divertion angle for LOS
+    betalos = np.pi / 4             # [rad] Minimum divertion angle for LOS (45 deg seems optimal)
     adsbmax = 200 * 1000            # [m] Maximum ADS-B range
     beta    =  np.pi/4 + betalos/2
-    if priocode == "FF8":
+    if priocode == "FF8" or priocode == "FF9":
         adsbmax /= 2
     
     # Relevant info from traf
@@ -142,6 +146,8 @@ def constructSSD(dbconf, traf, priocode = "FF1"):
     hdg     = traf.hdg
     gs_ap   = traf.ap.tas
     hdg_ap  = traf.ap.trk
+    apnorth = np.cos(hdg_ap / 180 * np.pi) * gs_ap
+    apeast  = np.sin(hdg_ap / 180 * np.pi) * gs_ap
     
     # Local variables, will be put into dbconf later
     FRV_loc          = [None] * traf.ntraf
@@ -247,8 +253,8 @@ def constructSSD(dbconf, traf, priocode = "FF1"):
                 # Now account for ADS-B range in indices of other aircraft (i_other)
                 ind = ind[ac_adsb]
                 i_other = i_other[ac_adsb]
-                if not priocode == "FF8":
-                    # Put it in class-object (not for FF8)
+                if not priocode == "FF8" and not priocode == "FF9":
+                    # Put it in class-object (not for FF8 and FF9)
                     dbconf.inrange[i]  = i_other
                 else:
                     dbconf.inrange2[i] = i_other
@@ -332,9 +338,15 @@ def constructSSD(dbconf, traf, priocode = "FF1"):
 #                    if pyclipper.PointInPolygon(pyclipper.scale_to_clipper((gseast[i],gsnorth[i])),VO):
 #                        dbconf.confmatrix[i,i_other[j]] = True
                     # Detect conf for smaller layer in FF8
-                    if priocode == "FF8":
+                    if priocode == "FF8" or priocode == "FF9":
                         if pyclipper.PointInPolygon(pyclipper.scale_to_clipper((gseast[i],gsnorth[i])),VO):
                             dbconf.inconf2[i] = True
+                    if priocode == "FF4":
+                        if pyclipper.PointInPolygon(pyclipper.scale_to_clipper((apeast[i],apnorth[i])),VO):
+                            dbconf.ap_free[i] = False
+#                    elif priocode == "FF9":
+#                        if pyclipper.PointInPolygon(pyclipper.scale_to_clipper((apeast[i],apnorth[i])),VO):
+#                            dbconf.ap_free2[i] = False
                         
                 
                     
@@ -343,9 +355,14 @@ def constructSSD(dbconf, traf, priocode = "FF1"):
 #                N += 1
                 ARV = pc.Execute(pyclipper.CT_DIFFERENCE, pyclipper.PFT_NONZERO, pyclipper.PFT_NONZERO)
 #                N += 1
-                    
+#                if priocode == "FF4":
+#                    if pyclipper.PointInPolygon(pyclipper.scale_to_clipper((apeast[i],apnorth[i])),ARV):
+#                        dbconf.ap_free[i] = True
+#                elif priocode == "FF9":
+#                    if pyclipper.PointInPolygon(pyclipper.scale_to_clipper((apeast[i],apnorth[i])),ARV):
+#                        dbconf.ap_free2[i] = True 
                 
-                if not priocode == "FF1" and not priocode == "FF8":
+                if not priocode == "FF1" and not priocode == "FF4" and not priocode == "FF8" and not priocode == "FF9":
                     # Make another clipper object for extra intersections
                     pc2 = pyclipper.Pyclipper()
                     # When using RotA clip with pc_rota
@@ -450,7 +467,7 @@ def constructSSD(dbconf, traf, priocode = "FF1"):
 #        dbconf.inconf = np.sum(dbconf.confmatrix, axis=0) > 0
 
     # If sequential (layered) approach, the local might me put elsewhere
-    if not priocode == "FF8":
+    if not priocode == "FF8" and not priocode == "FF9":
         dbconf.FRV          = FRV_loc
         dbconf.ARV          = ARV_loc
         dbconf.ARV_calc     = ARV_calc_loc
@@ -470,12 +487,12 @@ def resolve_closest(dbconf, traf):
     # It's just linalg, however credits to: http://stackoverflow.com/a/1501725
     # Variables
     ARV = dbconf.ARV_calc
-    if dbconf.priocode == "FF8":
+    if dbconf.priocode == "FF8" or dbconf.priocode == "FF9":
         ARV2 = dbconf.ARV_calc2
     # Select AP-setting as point
-    if dbconf.priocode == "FF4":
+    if dbconf.priocode == "FF4" or dbconf.priocode == "FF9":
         gsnorth = np.cos(traf.ap.trk / 180 * np.pi) * traf.ap.tas
-        gseast = np.sin(traf.ap.trk / 180 * np.pi) * traf.ap.tas
+        gseast  = np.sin(traf.ap.trk / 180 * np.pi) * traf.ap.tas
     else:
         gsnorth = traf.gsnorth
         gseast  = traf.gseast
@@ -484,43 +501,19 @@ def resolve_closest(dbconf, traf):
     # Loop through SSDs of all aircraft
     for i in range(ntraf):
         # Only those that are in conflict need to resolve
-        if dbconf.inconf[i] and len(ARV[i]) > 0:
-            
-            # Loop through all exteriors and append. Afterwards concatenate
-            p = []
-            q = []
-            for j in range(len(ARV[i])):
-                p.append(np.array(ARV[i][j]))
-                q.append(np.diff(np.row_stack((p[j], p[j][0])), axis=0))
-            p = np.concatenate(p)
-            q = np.concatenate(q)
-            # Calculate squared distance between edges
-            l2 = np.sum(q ** 2, axis=1)
-            # Catch l2 == 0 (exception)
-            same = l2 < 1e-8
-            l2[same] = 1.
-            # Calc t
-            t = np.sum((np.array([gseast[i], gsnorth[i]]) - p) * q, axis=1) / l2
-            # Speed of boolean indices only slightly faster (negligible)
-            # t must be limited between 0 and 1
-            t = np.clip(t, 0., 1.)
-            t[same] = 0.
-            # Calculate closest point to each edge
-            x1 = p[:,0] + t * q[:,0]
-            y1 = p[:,1] + t * q[:,1]
-            # Get distance squared
-            d2 = (x1 - gseast[i]) ** 2 + (y1 - gsnorth[i]) ** 2
-            # Sort distance
-            ind = np.argsort(d2)
-            x1  = x1[ind]
-            y1  = y1[ind]
-            
-            if dbconf.priocode == "FF8" and dbconf.inconf2[i]:
+        if dbconf.inconf[i] and len(ARV[i]) > 0:    
+            # First check if AP-setting is free
+            if 0:
+                1
+#            if dbconf.ap_free[i] and dbconf.priocode == "FF4" or dbconf.priocode == "FF9":
+#                dbconf.asase[i] = gseast[i]
+#                dbconf.asasn[i] = gsnorth[i]  
+            else:
                 # Loop through all exteriors and append. Afterwards concatenate
                 p = []
                 q = []
-                for j in range(len(ARV2[i])):
-                    p.append(np.array(ARV2[i][j]))
+                for j in range(len(ARV[i])):
+                    p.append(np.array(ARV[i][j]))
                     q.append(np.diff(np.row_stack((p[j], p[j][0])), axis=0))
                 p = np.concatenate(p)
                 q = np.concatenate(q)
@@ -536,77 +529,115 @@ def resolve_closest(dbconf, traf):
                 t = np.clip(t, 0., 1.)
                 t[same] = 0.
                 # Calculate closest point to each edge
-                x2 = p[:,0] + t * q[:,0]
-                y2 = p[:,1] + t * q[:,1]
+                x1 = p[:,0] + t * q[:,0]
+                y1 = p[:,1] + t * q[:,1]
                 # Get distance squared
-                d2 = (x2 - gseast[i]) ** 2 + (y2 - gsnorth[i]) ** 2
+                d2 = (x1 - gseast[i]) ** 2 + (y1 - gsnorth[i]) ** 2
                 # Sort distance
                 ind = np.argsort(d2)
-                x2  = x2[ind]
-                y2  = y2[ind]
-                d2  = d2[ind]
-# NOW HANDLED BY ARV_calc!!
-            # Check right-turning
-#            if priocode > 0:
-#                # Calculate angles of resolutions and in order of ind
-#                # Used http://stackoverflow.com/a/16544330
-#                dot = x * gseast[i]  + y * gsnorth[i]
-#                det = x * gsnorth[i] - y *  gseast[i]
-#                angles = np.arctan2(det, dot)
-#                # Check right/left-turning
-#                if priocode == 1:
-#                    bool_right = angles[ind] >= 0
-#                else:                    
-#                    bool_right = angles[ind] <= 0
-#                # Check if there are right-turning solutions:
-#                if sum(bool_right) > 0:
-#                    ind = ind[bool_right]
-            
-            # Store result in dbconf
-            if not dbconf.priocode == "FF8" or not dbconf.inconf2[i]:
-                dbconf.asase[i] = x1[0]
-                dbconf.asasn[i] = y1[0]
-            else:
-                # Sequential method, check if both result in very similar resolutions
-                if (x1[0] - x2[0])*(x1[0] - x2[0]) + (x1[0] - x2[0])*(x1[0] - x2[0]) < 1:
-                    # In that case take the full layer
+                x1  = x1[ind]
+                y1  = y1[ind]
+                
+                if dbconf.priocode == "FF8" or dbconf.priocode == "FF9" and dbconf.inconf2[i]:
+                    # Loop through all exteriors and append. Afterwards concatenate
+                    p = []
+                    q = []
+                    for j in range(len(ARV2[i])):
+                        p.append(np.array(ARV2[i][j]))
+                        q.append(np.diff(np.row_stack((p[j], p[j][0])), axis=0))
+                    p = np.concatenate(p)
+                    q = np.concatenate(q)
+                    # Calculate squared distance between edges
+                    l2 = np.sum(q ** 2, axis=1)
+                    # Catch l2 == 0 (exception)
+                    same = l2 < 1e-8
+                    l2[same] = 1.
+                    # Calc t
+                    t = np.sum((np.array([gseast[i], gsnorth[i]]) - p) * q, axis=1) / l2
+                    # Speed of boolean indices only slightly faster (negligible)
+                    # t must be limited between 0 and 1
+                    t = np.clip(t, 0., 1.)
+                    t[same] = 0.
+                    # Calculate closest point to each edge
+                    x2 = p[:,0] + t * q[:,0]
+                    y2 = p[:,1] + t * q[:,1]
+                    # Get distance squared
+                    d2 = (x2 - gseast[i]) ** 2 + (y2 - gsnorth[i]) ** 2
+                    # Sort distance
+                    ind = np.argsort(d2)
+                    x2  = x2[ind]
+                    y2  = y2[ind]
+                    d2  = d2[ind]
+    # NOW HANDLED BY ARV_calc!!
+                # Check right-turning
+    #            if priocode > 0:
+    #                # Calculate angles of resolutions and in order of ind
+    #                # Used http://stackoverflow.com/a/16544330
+    #                dot = x * gseast[i]  + y * gsnorth[i]
+    #                det = x * gsnorth[i] - y *  gseast[i]
+    #                angles = np.arctan2(det, dot)
+    #                # Check right/left-turning
+    #                if priocode == 1:
+    #                    bool_right = angles[ind] >= 0
+    #                else:                    
+    #                    bool_right = angles[ind] <= 0
+    #                # Check if there are right-turning solutions:
+    #                if sum(bool_right) > 0:
+    #                    ind = ind[bool_right]
+                
+                # Store result in dbconf
+                if not dbconf.inconf2[i] or not dbconf.priocode == "FF8" and not dbconf.priocode == "FF9":
                     dbconf.asase[i] = x1[0]
                     dbconf.asasn[i] = y1[0]
                 else:
-                    # In that case take the partial layer solution and see which
-                    # results in lower TLOS
-                    dbconf.asase[i] = x1[0]
-                    dbconf.asasn[i] = y1[0]
-                    # dv2 for the FF1-solution
-                    dist12 = (x1[0] - gseast[i]) ** 2 + (y1[0] - gsnorth[i]) ** 2
-                    # distances for the partial layer solution stored in d2
-                    ind = d2 < dist12
-                    if sum(ind) == 1:
-                        dbconf.asase[i] = x2[0]
-                        dbconf.asasn[i] = y2[0]
-                    elif sum(ind) > 1:
-                        x2 = x2[d2 < dist12]
-                        y2 = y2[d2 < dist12]
-#                        # Get solution with minimum TLOS
-#                        dbconf.asase[i] = x1[0]
-#                        dbconf.asasn[i] = y1[0]
-                        
-                        i_other = dbconf.inrange[i]
-                        idx = minTLOS(dbconf, traf, i, i_other, x1, y1, x2, y2)
-                        # Get solution with maximum TLOS
-                        dbconf.asase[i] = x2[idx]
-                        dbconf.asasn[i] = y2[idx]
+                    # Sequential method, check if both result in very similar resolutions
+                    if (x1[0] - x2[0])*(x1[0] - x2[0]) + (x1[0] - x2[0])*(x1[0] - x2[0]) < 1:
+                        # In that case take the full layer
+                        dbconf.asase[i] = x1[0]
+                        dbconf.asasn[i] = y1[0]
                     else:
-                        print "ERROR SHOULD NOT BE HAPPENING"
-                        print x1
-                        print y1
-                        print x2
-                        print y2
-                        asdasd
-            
-            # resoeval should be set to True now
-            if not dbconf.asaseval:
-                dbconf.asaseval = True
+                        # In that case take the partial layer solution and see which
+                        # results in lower TLOS
+                        dbconf.asase[i] = x1[0]
+                        dbconf.asasn[i] = y1[0]
+                        # dv2 for the FF1-solution
+                        dist12 = (x1[0] - gseast[i]) ** 2 + (y1[0] - gsnorth[i]) ** 2
+                        # distances for the partial layer solution stored in d2
+                        ind = d2 < dist12
+                        if sum(ind) == 1:
+                            dbconf.asase[i] = x2[0]
+                            dbconf.asasn[i] = y2[0]
+                        elif sum(ind) > 1:
+                            x2 = x2[ind]
+                            y2 = y2[ind]
+    #                        # Get solution with minimum TLOS
+    #                        dbconf.asase[i] = x1[0]
+    #                        dbconf.asasn[i] = y1[0]
+                            
+                            i_other = dbconf.inrange[i]
+                            idx = minTLOS(dbconf, traf, i, i_other, x1, y1, x2, y2)
+                            # Get solution with maximum TLOS
+                            dbconf.asase[i] = x2[idx]
+                            dbconf.asasn[i] = y2[idx]
+                        else:
+                            dbconf.asase[i] = x1[0]
+                            dbconf.asasn[i] = y1[0]
+    #                        print "ERROR SHOULD NOT BE HAPPENING"
+    #                        print d2
+    #                        print dist12
+    #                        print x1
+    #                        print y1
+    #                        print x2
+    #                        print y2
+    #                        print gseast[i]
+    #                        print gsnorth[i]
+    #                        print traf.gsnorth[i]
+    #                        print traf.gseast[i]
+    #                        print i
+                
+                # resoeval should be set to True now
+                if not dbconf.asaseval:
+                    dbconf.asaseval = True
         # Those that are not in conflict will be assigned zeros
         # Or those that have no solutions (full ARV)
         else:

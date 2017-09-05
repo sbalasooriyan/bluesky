@@ -289,7 +289,7 @@ class ASAS(DynamicArrays):
     def SetPrio(self, flag=None, priocode="FF1"):
         '''Set the prio switch and the type of prio '''
         if self.cr_name == "SSD":
-            options = ["FF1","FF2","FF3","FF4","FF5","FF6","FF7","FF8"]
+            options = ["FF1","FF2","FF3","FF4","FF5","FF6","FF7","FF8","FF9"]
         else:
             options = ["FF1", "FF2", "FF3", "LAY1", "LAY2"]
         if flag is None:
@@ -303,7 +303,8 @@ class ASAS(DynamicArrays):
                              "\n     FF5:  Heading first, FF1 second" + \
                              "\n     FF6:  Speed first, FF1 second" + \
                              "\n     FF7:  Counterclockwise turning" + \
-                             "\n     FF8:  Sequential" + \
+                             "\n     FF8:  Sequential FF1" + \
+                             "\n     FF9:  Sequential FF4" + \
                              "\nPriority is currently " + ("ON" if self.swprio else "OFF") + \
                              "\nPriority code is currently: " + str(self.priocode) 
             else:
