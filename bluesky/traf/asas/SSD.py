@@ -503,11 +503,11 @@ def resolve_closest(dbconf, traf):
         # Only those that are in conflict need to resolve
         if dbconf.inconf[i] and len(ARV[i]) > 0:    
             # First check if AP-setting is free
-            if 0:
-                1
-#            if dbconf.ap_free[i] and dbconf.priocode == "FF4" or dbconf.priocode == "FF9":
-#                dbconf.asase[i] = gseast[i]
-#                dbconf.asasn[i] = gsnorth[i]  
+#            if 0:
+#                1
+            if dbconf.ap_free[i] and dbconf.priocode == "FF4" or dbconf.priocode == "FF9":
+                dbconf.asase[i] = gseast[i]
+                dbconf.asasn[i] = gsnorth[i]  
             else:
                 # Loop through all exteriors and append. Afterwards concatenate
                 p = []
