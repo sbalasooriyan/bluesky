@@ -505,7 +505,8 @@ def resolve_closest(dbconf, traf):
             # First check if AP-setting is free
 #            if 0:
 #                1
-            if dbconf.ap_free[i] and dbconf.priocode == "FF4" or dbconf.priocode == "FF9":
+#            if dbconf.ap_free[i] and dbconf.priocode == "FF4" or dbconf.priocode == "FF9":
+            if dbconf.ap_free[i] and dbconf.priocode == "FF4":
                 dbconf.asase[i] = gseast[i]
                 dbconf.asasn[i] = gsnorth[i]  
             else:
