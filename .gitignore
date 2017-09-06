@@ -69,3 +69,4 @@ ssd.obj
 *.pickle
 *.ini
 *.pickle
+*.zip
