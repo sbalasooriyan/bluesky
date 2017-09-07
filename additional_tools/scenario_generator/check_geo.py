@@ -22,9 +22,9 @@ def makeRects(curLat, curLon, TAS, heading):
     # Number of aircraft
     nAC = heading.shape[0]
     # Rectangle half-height [NM]
-    spacing = 5.1
+    spacing = 6.0
     # Look-aheadtime rectangle [h]
-    look = 3. / 60.
+    look = 5. / 60.
     
     # 'Diagonals'
     distA  = (spacing * spacing + TAS * look * TAS * look) ** 0.5

@@ -49,13 +49,14 @@ countdown = 0
 # CR-methods and rules separated by hyphen
 methods = ['OFF-OFF','MVP-OFF','SSD-FF1','SSD-FF2','SSD-FF3','SSD-FF4','SSD-FF5','SSD-FF6']
 # V-range in kts
-vranges = [[450.0,500.0],[300.0,500.0]]
+vranges = [[450.0,500.0],[400.0,500.0],[300.0,500.0]]
 
 # Traffic densities and repetitions of each density
-minDensity     = 1.00         # [ac/10,000 NM^2]
-maxDensity     = 2.0         # [ac/10,000 NM^2]
-numDensities   = 2 
-numRepetitions = 10
+#minDensity     = 1.00         # [ac/10,000 NM^2]
+#maxDensity     = 10.0         # [ac/10,000 NM^2]
+densities = np.array([1.0,2.5,5.0,7.5,10.0])
+numDensities   = 5 
+numRepetitions = 50
 
 # Average TAS of aircraft [kts]
 TASmin = 450.0
@@ -95,10 +96,10 @@ modelAreaFactor = 0.75
 #%% Claculated Constants
 
 # common ratio for density steps
-commonRatio = np.power(10.0, np.log10(maxDensity/minDensity)/(numDensities-1.0))
+#commonRatio = np.power(10.0, np.log10(maxDensity/minDensity)/(numDensities-1.0))
 
 # Denities are computed using a geometric series [ac/10,000 NM^2]
-densities = minDensity*np.power(commonRatio,range(numDensities))
+#densities = minDensity*np.power(commonRatio,range(numDensities))
 
 # Flight distance related variables [NM]
 
@@ -124,7 +125,7 @@ spawnRate     = (nacInst*TASavg*kts)/(distAvg*nm)
 spawnInterval = 1.0/spawnRate
 
 # Total number of aircraft in scenario for the total scenario duration
-nacTotal = np.ceil(scenarioDuration*3600.0/spawnInterval)
+nacTotal = np.int64(np.ceil(scenarioDuration*3600.0/spawnInterval))
 
 # Flat earth correction at latCenter
 coslatinv = 1.0/np.cos(np.deg2rad(latCenter))

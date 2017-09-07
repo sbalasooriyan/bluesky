@@ -61,15 +61,15 @@ def routeComputer(density, repetition, nacInst, nacTotal, spawnInterval, scenari
     
     #%% Step 4: Determine the TAS at ground and CAS at cruising and deletion altitude
     
-    # Have some extra margin for altitudeDel, make sure that aircraft will descend below original altitudeDel
-    altitudeDel = 2.0 * altitudeDel - altitude
+#    # Have some extra margin for altitudeDel, make sure that aircraft will descend below original altitudeDel
+#    altitudeDel = 2.0 * altitudeDel - altitude
     
     # TAS at ground [kts] (at 0 altitude, there is no 'real' difference between CAS and TAS)
     TASground = np.random.uniform(low=TASmin, high=TASmax, size=nacTotal)
     
     # CAS at cruising and deletion altitude needs to be taken into account [kts]
     CAScruise = vtas2cas(TASground*kts, altitude*ft)/kts   
-    CASdel = vtas2cas(TASground*kts, altitudeDel*ft)/kts
+    CASdel = vtas2cas(TASground*kts, (2.0 * altitudeDel - altitude)*ft)/kts
     
     #%% Step 5: Select Origin and Destination based on heading and distance
     
@@ -149,6 +149,7 @@ def routeComputer(density, repetition, nacInst, nacTotal, spawnInterval, scenari
     
     # Calculate the latitude and longitude of ToC [deg]
     TODlat, TODlon = qdrpos(destLat, destLon, np.array(bearingDest2Orig), distHorizDescent)
+    destLat, destLon = qdrpos(destLat, destLon, np.array(heading), distHorizDescent)
     
     #%% Step 7: Set-up Scenario-matrix
       
@@ -162,7 +163,7 @@ def routeComputer(density, repetition, nacInst, nacTotal, spawnInterval, scenari
     scenario[:,7]  = CAScruise
     scenario[:,8]  = CASdel
     scenario[:,9]  = altitude
-    scenario[:,10] = altitudeDel
+    scenario[:,10] = 2.0 * altitudeDel - altitude
     scenario[:,11] = TODlat
     scenario[:,12] = TODlon
     
