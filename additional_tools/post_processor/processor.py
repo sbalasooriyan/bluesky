@@ -82,8 +82,8 @@ def sanity(data, data_type, log, nAC):
     return
 
 # Storage folders for log-files
-logFilesDir = './output_inst227/'
-pdFileName  = 'pd1.pickle'
+logFilesDir = './check/'
+pdFileName  = 'pd_temp.pickle'
 
 # ProcessedData
 PD = ProcessedData()
@@ -234,6 +234,8 @@ for log in logFiles:
     PD.mcfl.append(sum(cfl_count>1))
     PD.mcfl_max.append(max(cfl_count))
     PD.nac.append(nAC)
+    
+PD.numpify()
 
 
 with open(pdFileName, 'wb') as handle:
