@@ -132,7 +132,7 @@ def constructSSD(dbconf, traf, priocode = "FF1"):
     hsepm   = hsep * margin         # [m] Horizontal separation with safety margin
     alpham  = 0.4999 * np.pi        # [rad] Maximum half-angle for VO
     betalos = np.pi / 4             # [rad] Minimum divertion angle for LOS (45 deg seems optimal)
-    adsbmax = 200 * 1000            # [m] Maximum ADS-B range
+    adsbmax = 80. * nm              # [m] Maximum ADS-B range
     beta    =  np.pi/4 + betalos/2
     if priocode == "FF8" or priocode == "FF9":
         adsbmax /= 2

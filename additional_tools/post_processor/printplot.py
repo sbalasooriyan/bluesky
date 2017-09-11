@@ -19,7 +19,7 @@ def replaceColNames(colnames):
 # Settings
 pdFileName  = 'check.pickle'
 showTable   = True
-showPlot    = False
+showPlot    = True
 showLatex   = False
 
 with open(pdFileName, 'rb') as handle:
@@ -35,7 +35,7 @@ if showTable:
     for inst in insts:
         idx = PD.inst == inst
         colnames = np.unique(np.array(sorted(PD.method[idx])))
-        rownames = np.array(["CFL","LOS","AC with MCFL","MCFL_max","CFL/AC",\
+        rownames = np.array(["CFL","LOS","LOS_INTIME","AC with MCFL","MCFL_max","CFL/AC",\
                              "TIME/AC","DIST/AC","WORK/AC","TIMEINCFL/CFL","TIMEINLOS/LOS","TIMEINCFL/AC","TIMEINLOS/AC","DENSITY"])
         show_data = np.zeros((rownames.shape[0],colnames.shape[0]))
         for i in range(show_data.shape[1]):
@@ -43,17 +43,18 @@ if showTable:
             N = float(sum(ind))
             show_data[0,i] = np.sum(PD.cfl_sum[ind])/N
             show_data[1,i] = np.sum(PD.los_sum[ind])/N
-            show_data[2,i] = np.sum(PD.mcfl[ind])/N
-            show_data[3,i] = np.sum(PD.mcfl_max[ind])/N
-            show_data[4,i] = np.sum(PD.cfl_sum[ind]/PD.nac[ind])/N
-            show_data[5,i] = np.sum(PD.time[ind])/N
-            show_data[6,i] = np.sum(PD.dist[ind])/N
-            show_data[7,i] = np.sum(PD.work[ind])/N
-            show_data[8,i] = np.sum(PD.cfltime[ind])/N
-            show_data[9,i] = np.sum(PD.lostime[ind])/N
-            show_data[10,i] = np.sum(PD.cfltime[ind]*PD.cfl_sum[ind]/PD.nac[ind])/N
-            show_data[11,i] = np.sum(PD.lostime[ind]*PD.los_sum[ind]/PD.nac[ind])/N
-            show_data[12,i] = np.sum(PD.density[ind])/N
+            show_data[2,i] = np.sum(PD.los_count[ind])/N
+            show_data[3,i] = np.sum(PD.mcfl[ind])/N
+            show_data[4,i] = np.sum(PD.mcfl_max[ind])/N
+            show_data[5,i] = np.sum(PD.cfl_sum[ind]/PD.nac[ind])/N
+            show_data[6,i] = np.sum(PD.time[ind])/N
+            show_data[7,i] = np.sum(PD.dist[ind])/N
+            show_data[8,i] = np.sum(PD.work[ind])/N
+            show_data[9,i] = np.sum(PD.cfltime[ind])/N
+            show_data[10,i] = np.sum(PD.lostime[ind])/N
+            show_data[11,i] = np.sum(PD.cfltime[ind]*PD.cfl_sum[ind]/PD.nac[ind])/N
+            show_data[12,i] = np.sum(PD.lostime[ind]*PD.los_sum[ind]/PD.nac[ind])/N
+            show_data[13,i] = np.sum(PD.density[ind])/N
         
         pandas.set_option('expand_frame_repr', False)
         
@@ -61,10 +62,12 @@ if showTable:
         print pandas.DataFrame(show_data,rownames,colnames)
 
 if showPlot:
-    plt.close('all')
+#    plt.close('all')
 #    datas = []
-    fig, axes = plt.subplots(nrows=4, ncols=len(insts))
+    fig, axes = plt.subplots(nrows=5, ncols=len(insts))
     fig2, axes2 = plt.subplots(nrows=5, ncols=len(insts))
+    fig.canvas.set_window_title(pdFileName[:-7] + ' - 1')
+    fig2.canvas.set_window_title(pdFileName[:-7] + ' - 2')
     k = -1
     for inst in insts:
         idx = PD.inst == inst
@@ -82,6 +85,7 @@ if showPlot:
         boxes7 = []
         boxes8 = []
         boxes9 = []
+        boxes10 = []
         for col in colnames:
             ind = np.logical_and(PD.method == col,idx)
             boxes.append(PD.cfl_sum[ind]/PD.nac[ind])
@@ -95,6 +99,7 @@ if showPlot:
             boxes6.append(PD.cfltime[ind])
             boxes7.append(PD.lostime[ind])
             boxes8.append(PD.mcfl[ind])
+            boxes10.append(PD.los_count[ind]/PD.nac[ind])
         # Density
         dens = round(inst * 10000. / 455625.,1)
         k += 1
@@ -107,6 +112,8 @@ if showPlot:
             axes[2,k].set_title('AC in MCFL with ' + r'$\rho =$' + str(dens))
             axes[3,k].boxplot(boxes9, labels=replaceColNames(colnames))
             axes[3,k].set_title('Density with ' + r'$\rho =$' + str(dens))
+            axes[4,k].boxplot(boxes10, labels=replaceColNames(colnames2))
+            axes[4,k].set_title('LOS/AC counted with ' + r'$\rho =$' + str(dens))
             axes2[0,k].boxplot(boxes3, labels=replaceColNames(colnames))
             axes2[0,k].set_title('Travel time with ' + r'$\rho =$' + str(dens))
             axes2[1,k].boxplot(boxes4, labels=replaceColNames(colnames))
@@ -126,6 +133,8 @@ if showPlot:
             axes[2].set_title('AC in MCFL with ' + r'$\rho =$' + str(dens))
             axes[3].boxplot(boxes9, labels=replaceColNames(colnames))
             axes[3].set_title('Density with ' + r'$\rho =$' + str(dens))
+            axes[4].boxplot(boxes10, labels=replaceColNames(colnames2))
+            axes[4].set_title('LOS/AC counted with ' + r'$\rho =$' + str(dens))
             axes2[0].boxplot(boxes3, labels=replaceColNames(colnames))
             axes2[0].set_title('Travel time with ' + r'$\rho =$' + str(dens))
             axes2[1].boxplot(boxes4, labels=replaceColNames(colnames))

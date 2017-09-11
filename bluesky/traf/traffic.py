@@ -561,19 +561,19 @@ class Traffic(DynamicArrays):
         #---------- Performance Update ------------------------
         self.perf.perf(simt)
 
+        #---------- Flight Efficiency Update ------------------
+        self.UpdateEfficiency(simdt)
+
         #---------- Simulate Turbulence -----------------------
         self.Turbulence.Woosh(simdt)
 
         #---------- Aftermath ---------------------------------
         self.trails.update(simt)
+        self.UpdateEvtLog('updateconf')        
         self.area.check(simt)
-        
-        #---------- Flight Efficiency Update ------------------
-        self.UpdateEfficiency(simdt)
         
         #---------- Loggers -----------------------------------
         self.UpdateTrafCflLog()
-        self.UpdateEvtLog('updateconf')
         
         return
 

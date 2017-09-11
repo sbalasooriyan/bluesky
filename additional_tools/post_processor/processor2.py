@@ -25,6 +25,7 @@ class ProcessedData:
         self.vrange     = []
         self.cfl_sum    = []
         self.los_sum    = []
+        self.los_count  = []
         self.mcfl       = []
         self.mcfl_max   = []
         self.nac        = []
@@ -50,6 +51,7 @@ class ProcessedData:
         self.vrange     = np.array(self.vrange)
         self.cfl_sum    = np.array(self.cfl_sum)
         self.los_sum    = np.array(self.los_sum)
+        self.los_count  = np.array(self.los_count)
         self.mcfl       = np.array(self.mcfl)
         self.mcfl_max   = np.array(self.mcfl_max, dtype=np.float32)
         self.nac        = np.array(self.nac, dtype=np.float32)
@@ -155,6 +157,7 @@ class CFLLOS:
         if LOS:
             self.los = True
             self.sev = []
+            self.count = []
         else:
             self.los = False
     
@@ -170,6 +173,7 @@ class CFLLOS:
         self.open.append(True)
         if self.los:
             self.sev.append(0)
+            self.count.append(True)
     
     def end(self, idx, order, time, dist0, dist1, work0, work1, sev=None):
         self.time[idx] = time - self.time[idx]
@@ -237,6 +241,7 @@ def printError(n, varA=None, varB=None, varC=None):
 logFilesDir = './check/'
 pdFileName  = logFilesDir[2:-1] + '.pickle'
 Areas       = [455625.0, 810000.0]
+countlos    = 10.
 
 # ProcessedData
 PD = ProcessedData()
@@ -384,6 +389,8 @@ for log in logFiles:
                 if not combi in LD.combi:
                     # New combi
                     LD.new(combi, id0, id1, data[i,0], data[i,17], data[i+1,17], data[i,18], data[i+1,18])
+                    if data[i,0] - ACD.t0[ACD.id.index(id0)] <= countlos or data[i,0] - ACD.t0[ACD.id.index(id1)] <= countlos:
+                        LD.count[-1] = False
                     skip = True
                 else:
                     # Reopen existing
@@ -457,6 +464,7 @@ for log in logFiles:
     PD.nac.append(len(ACD.id))
     PD.cfl_sum.append(len(CD.combi))
     PD.los_sum.append(len(LD.combi))
+    PD.los_count.append(sum(LD.count))
     PD.mcfl.append(sum(ACD.mcfl>1))
     PD.mcfl_max.append(max(ACD.mcfl))
     PD.work.append(np.sum(ACD.work) / float(len(ACD.id)))
