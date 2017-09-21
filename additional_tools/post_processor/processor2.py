@@ -11,212 +11,10 @@ import pickle
 import pandas
 
 import warnings
-
+from dataclasses import ProcessedData, ACData, CFLLOS
 warnings.simplefilter('always')
 
-# Class processed data
-class ProcessedData:
-    """ Class holding all processed data """
-    
-    def __init__(self):
-        self.method     = []
-        self.inst       = []
-        self.rep        = []
-        self.vrange     = []
-        self.cfl_sum    = []
-        self.los_sum    = []
-        self.los_count  = []
-        self.mcfl       = []
-        self.mcfl_max   = []
-        self.nac        = []
-#        self.ACD        = []
-        self.time       = []
-        self.work       = []
-        self.dist       = []
-        self.cfltime    = []
-        self.cflwork    = []
-        self.cfldist    = []
-        self.lostime    = []
-        self.loswork    = []
-        self.losdist    = []
-        self.severities = []
-        self.instreal   = []
-        self.density    = []
-        self.outin      = []
-    
-    def numpify(self):
-        self.method     = np.array(self.method)
-        self.inst       = np.array(self.inst)
-        self.rep        = np.array(self.rep)
-        self.vrange     = np.array(self.vrange)
-        self.cfl_sum    = np.array(self.cfl_sum)
-        self.los_sum    = np.array(self.los_sum)
-        self.los_count  = np.array(self.los_count)
-        self.mcfl       = np.array(self.mcfl)
-        self.mcfl_max   = np.array(self.mcfl_max, dtype=np.float32)
-        self.nac        = np.array(self.nac, dtype=np.float32)
-        self.time       = np.array(self.time, dtype=np.float32)
-        self.work       = np.array(self.work, dtype=np.float32)
-        self.dist       = np.array(self.dist, dtype=np.float32)
-        self.cfltime    = np.array(self.cfltime, dtype=np.float32)
-        self.cflwork    = np.array(self.cflwork, dtype=np.float32)
-        self.cfldist    = np.array(self.cfldist, dtype=np.float32)
-        self.lostime    = np.array(self.lostime, dtype=np.float32)
-        self.loswork    = np.array(self.loswork, dtype=np.float32)
-        self.losdist    = np.array(self.losdist, dtype=np.float32)
-        self.severities = np.array(self.severities, dtype=np.float32)
-        self.instreal   = np.array(self.instreal, dtype=np.float32)
-        self.density    = np.array(self.density, dtype=np.float32)
-        self.outin      = np.array(self.outin, dtype=np.float32)
 
-    def calcDEP(self):
-        self.dep = np.zeros(np.shape(self.method), dtype=np.float32)
-        for i in range(np.shape(self.method)[0]):
-            if self.method[i] != "OFF-OFF":
-                ind = np.where(np.logical_and(self.method == "OFF-OFF",self.inst == self.inst[i], self.rep == self.rep[i]))[0]
-                if np.shape(ind)[0] > 0:
-                    self.dep[i] = float(self.cfl_sum[i]) / self.cfl_sum[ind[0]] - 1
-                else:
-                    print "Doesn't have OFF-OFF part for %s with inst = %d and rep %d" %(self.method[i], self.inst[i], self.rep[i])
-
-class ACData:
-    """ Class holding AC-data """
-    
-    def __init__(self):
-        self.id         = []
-        self.cfl        = []
-        self.los        = []
-        self.mcfl       = []
-        self.t0         = []
-        self.t1         = []
-        self.work       = []
-        self.dist       = []
-        self.cfl_cur    = []
-        self.cfltime    = []
-        self.lostime    = []
-        self.cfldist    = []
-        self.cflwork    = []
-        self.losdist    = []
-        self.loswork    = []
-        self.severities = []
-    
-    def cre(self, acid, t0):
-        self.id.append(acid)
-        self.t0.append(t0)
-        self.t1.append(None)
-        self.dist.append(None)
-        self.work.append(None)
-        self.cfl.append(None)
-        self.los.append(None)
-        self.mcfl.append(0)
-        self.cfl_cur.append(0)
-        self.cfltime.append(0)
-        self.cfldist.append(0)
-        self.cflwork.append(0)
-        self.lostime.append(0)
-        self.losdist.append(0)
-        self.loswork.append(0)
-        self.severities.append(np.array([]))
-    
-    def dlt(self, idx, t1, dist, work):
-        self.t1[idx]   = t1
-        self.dist[idx] = dist
-        self.work[idx] = work
-    
-    def numpify(self):
-        self.id         = np.array(self.id)
-        self.cfl        = np.array(self.cfl)
-        self.los        = np.array(self.los)
-        self.mcfl       = np.array(self.mcfl)
-        self.t0         = np.array(self.t0)
-        self.t1         = np.array(self.t1)
-        self.work       = np.array(self.work)
-        self.dist       = np.array(self.dist)
-        self.cfl_cur    = np.array(self.cfl_cur)
-        self.cfltime    = np.array(self.cfltime)
-        self.lostime    = np.array(self.lostime)
-        self.cfldist    = np.array(self.cfldist)
-        self.cflwork    = np.array(self.cflwork)
-        self.losdist    = np.array(self.losdist)
-        self.loswork    = np.array(self.loswork)
-        self.severities = np.array(self.severities)
-
-class CFLLOS:
-    """ Class holding CFL and LOS data """
-    
-    def __init__(self, LOS=False):
-        self.combi = []
-        self.id0   = []
-        self.id1   = []
-        self.time  = []
-        self.dist0 = []
-        self.dist1 = []
-        self.work0 = []
-        self.work1 = []
-        self.open  = []
-        if LOS:
-            self.los = True
-            self.sev = []
-            self.count = []
-        else:
-            self.los = False
-    
-    def new(self, combi, id0, id1, time, dist0, dist1, work0, work1):
-        self.combi.append(combi)
-        self.id0.append(id0)
-        self.id1.append(id1)
-        self.time.append(time)
-        self.work0.append(work0)
-        self.work1.append(work1)
-        self.dist0.append(dist0)
-        self.dist1.append(dist1)
-        self.open.append(True)
-        if self.los:
-            self.sev.append(0)
-            self.count.append(True)
-    
-    def end(self, idx, order, time, dist0, dist1, work0, work1, sev=None):
-        self.time[idx] = time - self.time[idx]
-        self.open[idx] = False
-        if order:
-            self.dist0[idx] = dist0 - self.dist0[idx]
-            self.work0[idx] = work0 - self.work0[idx]
-            self.dist1[idx] = dist1 - self.dist1[idx]
-            self.work1[idx] = work1 - self.work1[idx]
-        else:
-            self.dist0[idx] = dist0 - self.dist1[idx]
-            self.work0[idx] = work0 - self.work1[idx]
-            self.dist1[idx] = dist1 - self.dist0[idx]
-            self.work1[idx] = work1 - self.work0[idx]
-        if self.los:
-            self.sev[idx] = max(self.sev[idx], sev)
-    
-    def cnt(self, idx, order, time, dist0, dist1, work0, work1):
-        self.time[idx] = time - self.time[idx]
-        self.open[idx] = True
-        if order:
-            self.dist0[idx] = dist0 - self.dist0[idx]
-            self.work0[idx] = work0 - self.work0[idx]
-            self.dist1[idx] = dist1 - self.dist1[idx]
-            self.work1[idx] = work1 - self.work1[idx]
-        else:
-            self.dist0[idx] = dist0 - self.dist1[idx]
-            self.work0[idx] = work0 - self.work1[idx]
-            self.dist1[idx] = dist1 - self.dist0[idx]
-            self.work1[idx] = work1 - self.work0[idx]
-    
-    def numpify(self):
-        self.combi = np.array(self.combi)
-        self.id0   = np.array(self.id0)
-        self.id1   = np.array(self.id1)
-        self.time  = np.array(self.time)
-        self.dist0 = np.array(self.dist0)
-        self.dist1 = np.array(self.dist1)
-        self.work0 = np.array(self.work0)
-        self.work1 = np.array(self.work1)
-        self.open  = np.array(self.open)
-        if self.los:
-            self.sev = np.array(self.sev)
         
             
     
@@ -238,7 +36,7 @@ def printError(n, varA=None, varB=None, varC=None):
 
 
 # Storage folders for log-files
-logFilesDir = './check/'
+logFilesDir = './final_10_12345/'
 pdFileName  = logFilesDir[2:-1] + '.pickle'
 Areas       = [455625.0, 810000.0]
 countlos    = 10.
@@ -261,8 +59,8 @@ for log in logFiles:
     method, vrange, inst, rep = scn.split("_")
     # Get reso and rule
     reso, rule = method.split("-")
-    # Vrange in integers
-    vrange = map(int, vrange.split("-"))
+#    # Vrange in integers
+#    vrange = map(int, vrange.split("-"))
     # Inst
     inst = int(inst[4:])
     # Repetition
@@ -272,7 +70,8 @@ for log in logFiles:
     data = pandas.read_csv(logFilesDir+log, comment='#', delimiter=',', header=None)
     data = data.as_matrix()
     entries = np.shape(data)[0]
-    
+#    print np.array([min(data[data[:,5]==10972.80000000,7]),max(data[:,7])])/1852*3600
+#    print 1.*sum(np.logical_and(data[data[:,5]==10972.80000000,7]<=501*1852/3600,data[data[:,5]==10972.80000000,7]>=449*1852/3600))/sum(data[:,5]==10972.80000000)
 #    # Aircraft
 #    AC  = np.unique(data[:,1])
 #    nAC = np.shape(AC)[0]
@@ -337,10 +136,20 @@ for log in logFiles:
                 ACD.cfl_cur[ACD.id.index(id1)] += 1
                 ACD.mcfl[ACD.id.index(id0)] = max(ACD.cfl_cur[ACD.id.index(id0)], ACD.mcfl[ACD.id.index(id0)])
                 ACD.mcfl[ACD.id.index(id1)] = max(ACD.cfl_cur[ACD.id.index(id1)], ACD.mcfl[ACD.id.index(id1)])
+
                 if not combi in CD.combi:
                     # New combi
                     CD.new(combi, id0, id1, data[i,0], data[i,17], data[i+1,17], data[i,18], data[i+1,18])
                     skip = True
+                    # Edit time/dist/work in cfl
+                    if ACD.cfl_cur[ACD.id.index(id0)] == 1:
+                        ACD.cfltime[ACD.id.index(id0)] = data[i,0]  - ACD.cfltime[ACD.id.index(id0)]
+                        ACD.cfldist[ACD.id.index(id0)] = data[i,17] - ACD.cfldist[ACD.id.index(id0)]
+                        ACD.cflwork[ACD.id.index(id0)] = data[i,18] - ACD.cflwork[ACD.id.index(id0)]
+                    if ACD.cfl_cur[ACD.id.index(id1)] == 1:
+                        ACD.cfltime[ACD.id.index(id1)] = data[i,0]    - ACD.cfltime[ACD.id.index(id1)]
+                        ACD.cfldist[ACD.id.index(id1)] = data[i+1,17] - ACD.cfldist[ACD.id.index(id1)]
+                        ACD.cflwork[ACD.id.index(id1)] = data[i+1,18] - ACD.cflwork[ACD.id.index(id1)]
                 else:
                     # Reopen existing
                     idx = CD.combi.index(combi)
@@ -353,6 +162,15 @@ for log in logFiles:
                     if not CD.open[idx]:
                         CD.cnt(idx, order, data[i,0], data[i,17], data[i+1,17], data[i,18], data[i+1,18])
                         skip = True
+                        # Edit time/dist/work in cfl
+                        if ACD.cfl_cur[ACD.id.index(id0)] == 1:
+                            ACD.cfltime[ACD.id.index(id0)] = data[i,0]  - ACD.cfltime[ACD.id.index(id0)]
+                            ACD.cfldist[ACD.id.index(id0)] = data[i,17] - ACD.cfldist[ACD.id.index(id0)]
+                            ACD.cflwork[ACD.id.index(id0)] = data[i,18] - ACD.cflwork[ACD.id.index(id0)]
+                        if ACD.cfl_cur[ACD.id.index(id1)] == 1:
+                            ACD.cfltime[ACD.id.index(id1)] = data[i,0]    - ACD.cfltime[ACD.id.index(id1)]
+                            ACD.cfldist[ACD.id.index(id1)] = data[i+1,17] - ACD.cfldist[ACD.id.index(id1)]
+                            ACD.cflwork[ACD.id.index(id1)] = data[i+1,18] - ACD.cflwork[ACD.id.index(id1)]
                     else:
                         printError(6, combi)
             elif data[i,2][4:9] == "ENDED":
@@ -374,6 +192,15 @@ for log in logFiles:
                     if CD.open[idx]:
                         CD.end(idx, order, data[i,0], data[i,17], data[i+1,17], data[i,18], data[i+1,18])
                         skip = True
+                        # Edit time/dist/work in cfl
+                        if ACD.cfl_cur[ACD.id.index(id0)] == 0:
+                            ACD.cfltime[ACD.id.index(id0)] = data[i,0]  - ACD.cfltime[ACD.id.index(id0)]
+                            ACD.cfldist[ACD.id.index(id0)] = data[i,17] - ACD.cfldist[ACD.id.index(id0)]
+                            ACD.cflwork[ACD.id.index(id0)] = data[i,18] - ACD.cflwork[ACD.id.index(id0)]
+                        if ACD.cfl_cur[ACD.id.index(id1)] == 0:
+                            ACD.cfltime[ACD.id.index(id1)] = data[i,0]    - ACD.cfltime[ACD.id.index(id1)]
+                            ACD.cfldist[ACD.id.index(id1)] = data[i+1,17] - ACD.cfldist[ACD.id.index(id1)]
+                            ACD.cflwork[ACD.id.index(id1)] = data[i+1,18] - ACD.cflwork[ACD.id.index(id1)]
                     else:
                         printError(4, combi)
                 except ValueError:
@@ -386,12 +213,24 @@ for log in logFiles:
             if data[i,2][4:9] == "START":
                 if not data[i+1,2][4:9] == "START":
                     printError(1, i)
+                # MCFL
+                ACD.los_cur[ACD.id.index(id0)] += 1
+                ACD.los_cur[ACD.id.index(id1)] += 1
                 if not combi in LD.combi:
                     # New combi
                     LD.new(combi, id0, id1, data[i,0], data[i,17], data[i+1,17], data[i,18], data[i+1,18])
                     if data[i,0] - ACD.t0[ACD.id.index(id0)] <= countlos or data[i,0] - ACD.t0[ACD.id.index(id1)] <= countlos:
                         LD.count[-1] = False
                     skip = True
+                    # Edit time/dist/work in los
+                    if ACD.los_cur[ACD.id.index(id0)] == 1:
+                        ACD.lostime[ACD.id.index(id0)] = data[i,0]  - ACD.lostime[ACD.id.index(id0)]
+                        ACD.losdist[ACD.id.index(id0)] = data[i,17] - ACD.losdist[ACD.id.index(id0)]
+                        ACD.loswork[ACD.id.index(id0)] = data[i,18] - ACD.loswork[ACD.id.index(id0)]
+                    if ACD.los_cur[ACD.id.index(id1)] == 1:
+                        ACD.lostime[ACD.id.index(id1)] = data[i,0]    - ACD.lostime[ACD.id.index(id1)]
+                        ACD.losdist[ACD.id.index(id1)] = data[i+1,17] - ACD.losdist[ACD.id.index(id1)]
+                        ACD.loswork[ACD.id.index(id1)] = data[i+1,18] - ACD.loswork[ACD.id.index(id1)]
                 else:
                     # Reopen existing
                     idx = LD.combi.index(combi)
@@ -404,6 +243,15 @@ for log in logFiles:
                     if not LD.open[idx]:
                         LD.cnt(idx, order, data[i,0], data[i,17], data[i+1,17], data[i,18], data[i+1,18])
                         skip = True
+                        # Edit time/dist/work in los
+                        if ACD.los_cur[ACD.id.index(id0)] == 1:
+                            ACD.lostime[ACD.id.index(id0)] = data[i,0]  - ACD.lostime[ACD.id.index(id0)]
+                            ACD.losdist[ACD.id.index(id0)] = data[i,17] - ACD.losdist[ACD.id.index(id0)]
+                            ACD.loswork[ACD.id.index(id0)] = data[i,18] - ACD.loswork[ACD.id.index(id0)]
+                        if ACD.los_cur[ACD.id.index(id1)] == 1:
+                            ACD.lostime[ACD.id.index(id1)] = data[i,0]    - ACD.lostime[ACD.id.index(id1)]
+                            ACD.losdist[ACD.id.index(id1)] = data[i+1,17] - ACD.losdist[ACD.id.index(id1)]
+                            ACD.loswork[ACD.id.index(id1)] = data[i+1,18] - ACD.loswork[ACD.id.index(id1)]
                     else:
                         printError(6, combi)
             elif data[i,2][4:9] == "ENDED":
@@ -411,6 +259,9 @@ for log in logFiles:
                     printError(2, i)
                 [id0, id1] = sorted([data[i,1],data[i,2][10:]])
                 combi = id0 + ' ' + id1
+                # MCFL
+                ACD.los_cur[ACD.id.index(id0)] -= 1
+                ACD.los_cur[ACD.id.index(id1)] -= 1
                 try:
                     idx = LD.combi.index(combi)
                     if id0 == data[i,1] and id1 == data[i,2][10:]:
@@ -422,6 +273,15 @@ for log in logFiles:
                     if LD.open[idx]:
                         LD.end(idx, order, data[i,0], data[i,17], data[i+1,17], data[i,18], data[i+1,18], data[i,20])
                         skip = True
+                        # Edit time/dist/work in los
+                        if ACD.los_cur[ACD.id.index(id0)] == 0:
+                            ACD.lostime[ACD.id.index(id0)] = data[i,0]  - ACD.lostime[ACD.id.index(id0)]
+                            ACD.losdist[ACD.id.index(id0)] = data[i,17] - ACD.losdist[ACD.id.index(id0)]
+                            ACD.loswork[ACD.id.index(id0)] = data[i,18] - ACD.loswork[ACD.id.index(id0)]
+                        if ACD.los_cur[ACD.id.index(id1)] == 0:
+                            ACD.lostime[ACD.id.index(id1)] = data[i,0]    - ACD.lostime[ACD.id.index(id1)]
+                            ACD.losdist[ACD.id.index(id1)] = data[i+1,17] - ACD.losdist[ACD.id.index(id1)]
+                            ACD.loswork[ACD.id.index(id1)] = data[i+1,18] - ACD.loswork[ACD.id.index(id1)]
                     else:
                         printError(4, combi)
                 except ValueError:
@@ -431,29 +291,29 @@ for log in logFiles:
     CD.numpify()
     LD.numpify()
     
-    for i in range(len(ACD.id)):
-        # Bools
-        idxC0 = ACD.id[i] == CD.id0
-        idxC1 = ACD.id[i] == CD.id1
-        idxC = np.where(np.logical_or(idxC0, idxC1))[0]
-        
-        idxL0 = np.in1d(LD.id0, ACD.id[i])
-        idxL1 = np.in1d(LD.id1, ACD.id[i])
-        idxL = np.where(np.logical_or(idxL0, idxL1))[0]
-        # Fill CFLs
-        ACD.cfl[i] = idxC
-        # Fill LOSs
-        ACD.los[i] = idxL
-        # Other stuff
-        if len(CD.combi) > 0:
-            ACD.cfltime[i] = np.sum(CD.time[idxC])
-            ACD.cfldist[i] = np.sum(CD.dist0[idxC0]) + np.sum(CD.dist1[idxC1])
-            ACD.cflwork[i] = np.sum(CD.work0[idxC0]) + np.sum(CD.work1[idxC1])
-        if len(LD.combi) > 0:
-            ACD.lostime[i] = np.sum(LD.time[idxL])
-            ACD.losdist[i] = np.sum(LD.dist0[idxL0]) + np.sum(LD.dist1[idxL1])
-            ACD.loswork[i] = np.sum(LD.work0[idxL0]) + np.sum(LD.work1[idxL1])
-            ACD.severities[i] = np.sum(LD.sev[idxL]) / max(float(len(idxL)),1)
+#    for i in range(len(ACD.id)):
+#        # Bools
+#        idxC0 = ACD.id[i] == CD.id0
+#        idxC1 = ACD.id[i] == CD.id1
+#        idxC = np.where(np.logical_or(idxC0, idxC1))[0]
+#        
+#        idxL0 = np.in1d(LD.id0, ACD.id[i])
+#        idxL1 = np.in1d(LD.id1, ACD.id[i])
+#        idxL = np.where(np.logical_or(idxL0, idxL1))[0]
+#        # Fill CFLs
+#        ACD.cfl[i] = idxC
+#        # Fill LOSs
+#        ACD.los[i] = idxL
+#        # Other stuff
+#        if len(CD.combi) > 0:
+#            ACD.cfltime[i] = np.sum(CD.time[idxC])
+#            ACD.cfldist[i] = np.sum(CD.dist0[idxC0]) + np.sum(CD.dist1[idxC1])
+#            ACD.cflwork[i] = np.sum(CD.work0[idxC0]) + np.sum(CD.work1[idxC1])
+#        if len(LD.combi) > 0:
+#            ACD.lostime[i] = np.sum(LD.time[idxL])
+#            ACD.losdist[i] = np.sum(LD.dist0[idxL0]) + np.sum(LD.dist1[idxL1])
+#            ACD.loswork[i] = np.sum(LD.work0[idxL0]) + np.sum(LD.work1[idxL1])
+#            ACD.severities[i] = np.sum(LD.sev[idxL]) / max(float(len(idxL)),1)
     
     ACD.numpify()    
     
@@ -470,13 +330,15 @@ for log in logFiles:
     PD.work.append(np.sum(ACD.work) / float(len(ACD.id)))
     PD.dist.append(np.sum(ACD.dist) / float(len(ACD.id)))
     PD.time.append(np.sum(ACD.t1 - ACD.t0) / float(len(ACD.id)))
-    PD.cfltime.append(np.sum(ACD.cfltime) / float(nCFL))
-    PD.cflwork.append(np.sum(ACD.cflwork) / float(nCFL))
-    PD.cfldist.append(np.sum(ACD.cfldist) / float(nCFL))
-    PD.lostime.append(np.sum(ACD.lostime) / float(nLOS))
-    PD.loswork.append(np.sum(ACD.loswork) / float(nLOS))
-    PD.losdist.append(np.sum(ACD.losdist) / float(nLOS))
-    PD.severities.append(np.sum(ACD.severities) / float(nLOS))
+    PD.cfltime.append(np.sum(CD.time) / float(nCFL))
+    PD.timeincfl.append(np.sum(ACD.cfltime) / float(len(ACD.id)))
+    PD.cflwork.append(np.sum(ACD.cflwork) / float(len(ACD.id)))
+    PD.cfldist.append(np.sum(ACD.cfldist) / float(len(ACD.id)))
+    PD.lostime.append(np.sum(LD.time) / float(nLOS))
+    PD.timeinlos.append(np.sum(ACD.lostime) / float(len(ACD.id)))
+    PD.loswork.append(np.sum(ACD.loswork) / float(len(ACD.id)))
+    PD.losdist.append(np.sum(ACD.losdist) / float(len(ACD.id)))
+    PD.severities.append(np.sum(LD.sev) / float(nLOS))
     # Density related stuff
     ind = np.where(np.logical_and(data[:,0] >= 1800,data[:,0] <= 7200))[0]
     dt = np.diff(np.concatenate(([1800.],data[ind[0]:ind[-1]+1,0],[7200.])))
@@ -501,6 +363,7 @@ for log in logFiles:
 
 
 PD.numpify()
-PD.calcDEP()
+PD.calcParams()
+PD.changeMethodNames()
 with open(pdFileName, 'wb') as handle:
     pickle.dump(PD, handle, protocol=pickle.HIGHEST_PROTOCOL)
