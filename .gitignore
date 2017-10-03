@@ -70,3 +70,6 @@ ssd.obj
 *.ini
 *.pickle
 *.zip
+*.tex
+*.aux
+*.pdf

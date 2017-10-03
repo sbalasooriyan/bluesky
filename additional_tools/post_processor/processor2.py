@@ -36,7 +36,7 @@ def printError(n, varA=None, varB=None, varC=None):
 
 
 # Storage folders for log-files
-logFilesDir = './final_10_12345/'
+logFilesDir = './final_thesis/'
 pdFileName  = logFilesDir[2:-1] + '.pickle'
 Areas       = [455625.0, 810000.0]
 countlos    = 10.
