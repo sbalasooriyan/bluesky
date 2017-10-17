@@ -82,7 +82,7 @@ class ASAS(DynamicArrays):
         self.vsmin        = -3000. / 60. * ft          # [m/s] Minimum ASAS vertical speed
         self.vsmax        = 3000. / 60. * ft           # [m/s] Maximum ASAS vertical speed
 
-        self.swresohoriz  = False                      # [-] switch to limit resolution to the horizontal direction
+        self.swresohoriz  = True                       # [-] switch to limit resolution to the horizontal direction
         self.swresospd    = False                      # [-] switch to use only speed resolutions (works with swresohoriz = True)
         self.swresohdg    = False                      # [-] switch to use only heading resolutions (works with swresohoriz = True)
         self.swresovert   = False                      # [-] switch to limit resolution to the vertical direction
