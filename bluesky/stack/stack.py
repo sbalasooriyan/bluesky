@@ -679,8 +679,8 @@ def init():
         "ZOOM": [
             "ZOOM IN/OUT or factor",
             "float/txt",
-            lambda a: bs.scr.zoom(1.4142135623730951) if a == "IN" else \
-                      bs.scr.zoom(0.7071067811865475) if a == "OUT" else \
+            lambda a: bs.scr.zoom(1.4142135623730951, False) if a == "IN" else \
+                      bs.scr.zoom(0.7071067811865475, False) if a == "OUT" else \
                       bs.scr.zoom(a, True),
             "Zoom display in/out, you can also use +++ or -----"
         ]

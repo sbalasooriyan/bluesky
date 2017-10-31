@@ -161,13 +161,13 @@ class RadarWidget(QGLWidget):
         self.asas_vmax      = settings.asas_vmax
 
         # Display flags
-        self.show_map       = True
-        self.show_coast     = True
+        self.show_map       = False
+        self.show_coast     = False
         self.show_traf      = True
         self.show_pz        = False
-        self.show_lbl       = 2
-        self.show_wpt       = 1
-        self.show_apt       = 1
+        self.show_lbl       = 0
+        self.show_wpt       = 0
+        self.show_apt       = 0
 
         self.initialized    = False
 
@@ -533,7 +533,7 @@ class RadarWidget(QGLWidget):
 
         # Draw traffic symbols
         if self.naircraft > 0 and self.show_traf:
-            self.rwaypoints.draw(n_instances=self.routelbl.n_instances)
+#            self.rwaypoints.draw(n_instances=self.routelbl.n_instances)
             self.ac_symbol.draw(n_instances=self.naircraft)
 
         if self.zoom >= 0.5 and self.show_apt == 1 or self.show_apt == 2:
@@ -549,10 +549,10 @@ class RadarWidget(QGLWidget):
             nwaypoints = self.nnavaids
 
         # Draw waypoint symbols
-        if self.show_wpt:
-            self.waypoints.draw(n_instances=nwaypoints)
-            if self.ncustwpts > 0:
-                self.customwp.draw(n_instances=self.ncustwpts)
+#        if self.show_wpt:
+#            self.waypoints.draw(n_instances=nwaypoints)
+#            if self.ncustwpts > 0:
+#                self.customwp.draw(n_instances=self.ncustwpts)
 
         # Draw airport symbols
         if self.show_apt:
